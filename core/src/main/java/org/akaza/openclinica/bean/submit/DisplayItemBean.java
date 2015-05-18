@@ -14,6 +14,7 @@ import org.akaza.openclinica.service.crfdata.front.InstantOnChangeFrontStrGroup;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author ssachs
@@ -22,6 +23,7 @@ public class DisplayItemBean implements Comparable {
     private ItemDataBean data;
     private ItemBean item;
     private ItemFormMetadataBean metadata;
+    private ItemGroupMetadataBean groupMetadata;
     private String editFlag = "";// used for items in a group
     private ItemDataBean dbData; // used for DDE, items in a group
     private boolean isNewItem;
@@ -95,6 +97,13 @@ public class DisplayItemBean implements Comparable {
     private boolean blankDwelt;
 
     private InstantOnChangeFrontStrGroup instantFrontStrGroup;
+    private List<String> itemToSDV = new ArrayList<String>();
+    private List<String> newDn = new ArrayList<String>();
+    private List<String> updatedDn = new ArrayList<String>();
+    private List<String> resolutionProposedDn = new ArrayList<String>();
+    private List<String> closedDn = new ArrayList<String>();
+    private List<String> annotationDn = new ArrayList<String>();
+    private String field;
 
     private void setProperties() {
         data = new ItemDataBean();
@@ -624,4 +633,68 @@ public class DisplayItemBean implements Comparable {
 	public void setFieldName(String fieldName) {
 		this.fieldName = fieldName;
 	}
+
+    public List<String> getItemToSDV() {
+        return itemToSDV;
+    }
+
+    public void setItemToSDV(List<String> itemToSDV) {
+        this.itemToSDV = itemToSDV;
+    }
+
+    public String getField() {
+        return field;
+    }
+
+    public void setField(String field) {
+        this.field = field;
+    }
+
+    public List<String> getNewDn() {
+        return newDn;
+    }
+
+    public void setNewDn(List<String> newDn) {
+        this.newDn = newDn;
+    }
+
+    public List<String> getUpdatedDn() {
+        return updatedDn;
+    }
+
+    public void setUpdatedDn(List<String> updatedDn) {
+        this.updatedDn = updatedDn;
+    }
+
+    public List<String> getResolutionProposedDn() {
+        return resolutionProposedDn;
+    }
+
+    public void setResolutionProposedDn(List<String> resolutionProposedDn) {
+        this.resolutionProposedDn = resolutionProposedDn;
+    }
+
+    public List<String> getClosedDn() {
+        return closedDn;
+    }
+
+    public void setClosedDn(List<String> closedDn) {
+        this.closedDn = closedDn;
+    }
+
+    public List<String> getAnnotationDn() {
+        return annotationDn;
+    }
+
+    public void setAnnotationDn(List<String> annotationDn) {
+        this.annotationDn = annotationDn;
+    }
+
+    public ItemGroupMetadataBean getGroupMetadata() {
+        return groupMetadata;
+    }
+
+    public void setGroupMetadata(ItemGroupMetadataBean groupMetadata) {
+        this.groupMetadata = groupMetadata;
+    }
 }

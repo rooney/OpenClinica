@@ -162,8 +162,9 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
         answer.setShowItem(getBooleanFromRow(hm, "show_item"));
         // System.out.println("found show item: " + getBooleanFromRow(hm, "show_item"));
         // now get the response set
-        ResponseSetBean rsb = new ResponseSetBean();
+        answer.setSdvRequired(getBooleanFromRow(hm, "sdv_required"));
 
+        ResponseSetBean rsb = new ResponseSetBean();
         rsb.setId(getIntFromRow(hm, "response_set_id"));
         rsb.setLabel(getStringFromRow(hm, "label"));
         rsb.setResponseTypeId(getIntFromRow(hm, "response_type_id"));
@@ -176,7 +177,7 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
         return answer;
     }
 
-    public void setTypesExpected() {
+    public int setTypesExpected() {
         this.unsetTypeExpected();
 
         int ind = 1;
@@ -227,14 +228,18 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
         // will need to set the boolean value here, tbh 23
         this.setTypeExpected(ind, TypeNames.BOOL);
         ind++; // show_item 24
+        this.setTypeExpected(ind, TypeNames.BOOL);
+        ind++; // sdv_required 25
         this.setTypeExpected(ind, TypeNames.INT);
-        ind++; // response_set.response_type_id 25
+        ind++; // response_set.response_type_id 26
         this.setTypeExpected(ind, TypeNames.STRING);
-        ind++; // response_set.label 26
+        ind++; // response_set.label 27
         this.setTypeExpected(ind, TypeNames.STRING);
-        ind++; // response_set.options_text 27
+        ind++; // response_set.options_text 28
         this.setTypeExpected(ind, TypeNames.STRING);
-        ind++; // response_set.options_values
+        ind++; // response_set.options_values 29
+
+        return ind;
     }
 
     /*
@@ -435,14 +440,14 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
         // TODO place holder for returning here, tbh
         ArrayList<ItemFormMetadataBean> answer = new ArrayList<ItemFormMetadataBean>();
 
-        this.setTypesExpected();
+        int ind = this.setTypesExpected();
         // BWP: changed from 25 to 26 when added response_layout?
         // YW: now added width_decimal
-        this.setTypeExpected(28, TypeNames.STRING);// version name
+        this.setTypeExpected(ind++, TypeNames.STRING);// version name
         // add more here for display, tbh 082007
-        this.setTypeExpected(29, TypeNames.STRING);// group_label
-        this.setTypeExpected(30, TypeNames.INT);// repeat_max
-        this.setTypeExpected(31, TypeNames.STRING);// section_name
+        this.setTypeExpected(ind++, TypeNames.STRING);// group_label
+        this.setTypeExpected(ind++, TypeNames.INT);// repeat_max
+        this.setTypeExpected(ind, TypeNames.STRING);// section_name
         HashMap<Integer, Object> variables = new HashMap<Integer, Object>();
         variables.put(new Integer(1), new Integer(itemId));
 
@@ -475,14 +480,14 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
         // TODO place holder for returning here, tbh
         ArrayList<ItemFormMetadataBean> answer = new ArrayList<ItemFormMetadataBean>();
 
-        this.setTypesExpected();
+        int ind = this.setTypesExpected();
         // BWP: changed from 25 to 26 when added response_layout?
         // YW: now added width_decimal
-        this.setTypeExpected(28, TypeNames.STRING);// version name
+        this.setTypeExpected(ind++, TypeNames.STRING);// version name
         // add more here for display, tbh 082007
-        this.setTypeExpected(29, TypeNames.STRING);// group_label
-        this.setTypeExpected(30, TypeNames.INT);// repeat_max
-        this.setTypeExpected(31, TypeNames.STRING);// section_name
+        this.setTypeExpected(ind++, TypeNames.STRING);// group_label
+        this.setTypeExpected(ind++, TypeNames.INT);// repeat_max
+        this.setTypeExpected(ind, TypeNames.STRING);// section_name
         HashMap<Integer, Object> variables = new HashMap<Integer, Object>();
         variables.put(new Integer(1), new Integer(itemId));
 
@@ -585,7 +590,7 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
         ItemFormMetadataBean ifmb = (ItemFormMetadataBean) eb;
         HashMap<Integer, Comparable> variables = new HashMap<Integer, Comparable>();
 
-        int ind = 0;
+        int ind = 1;
         int id = getNextPK();
         variables.put(new Integer(ind), new Integer(id));
         ind++;
@@ -632,8 +637,10 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
         variables.put(new Integer(ind), ifmb.getWidthDecimal());
         ind++;
         variables.put(new Integer(ind), new Boolean(ifmb.isShowItem()));
+        ind++;
+        variables.put(new Integer(ind), new Boolean(ifmb.isSdvRequired()));
 
-        execute("create", variables);
+        execute(digester.getQuery("create"), variables);
 
         if (isQuerySuccessful()) {
             ifmb.setId(id);
@@ -650,8 +657,7 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
     public EntityBean update(EntityBean eb) throws OpenClinicaException {
         ItemFormMetadataBean ifmb = (ItemFormMetadataBean) eb;
         HashMap<Integer, Comparable> variables = new HashMap<Integer, Comparable>();
-
-        int ind = 0;
+        int ind = 1;
 
         variables.put(new Integer(ind), new Integer(ifmb.getItemId()));
         ind++;
@@ -689,8 +695,6 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
         ind++;
         variables.put(new Integer(ind), new Boolean(ifmb.isRequired()));
         ind++;
-        variables.put(new Integer(ind), new Integer(ifmb.getId()));
-        ind++;
         variables.put(new Integer(ind), ifmb.getDefaultValue());
         ind++;
         variables.put(new Integer(ind), ifmb.getResponseLayout());
@@ -699,9 +703,11 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
         ind++;
         variables.put(new Integer(ind), new Boolean(ifmb.isShowItem()));
         ind++;
-        variables.put(new Integer(ind), ifmb.getId());
+        variables.put(new Integer(ind), new Boolean(ifmb.isSdvRequired()));
+        ind++;
+        variables.put(new Integer(ind), new Integer(ifmb.getId()));
 
-        execute("update", variables);
+        execute(digester.getQuery("update"), variables);
 
         if (!isQuerySuccessful()) {
             ifmb.setId(0);
@@ -739,13 +745,13 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
     }
 
     public ItemFormMetadataBean findByItemIdAndCRFVersionId(int itemId, int crfVersionId) {
-        this.setTypesExpected();
+        int ind = this.setTypesExpected();
         // TODO note to come back here, tbh
-        this.setTypeExpected(28, TypeNames.STRING);// version name
+        this.setTypeExpected(ind++, TypeNames.STRING);// version name
         // add more here for display, tbh 082007
-        this.setTypeExpected(29, TypeNames.STRING);// group_label
-        this.setTypeExpected(30, TypeNames.INT);// repeat_max
-        this.setTypeExpected(31, TypeNames.STRING);// section_name
+        this.setTypeExpected(ind++, TypeNames.STRING);// group_label
+        this.setTypeExpected(ind++, TypeNames.INT);// repeat_max
+        this.setTypeExpected(ind, TypeNames.STRING);// section_name
 
         logMe("Current Thread:::"+Thread.currentThread()+"types Expected?");
         HashMap<Integer, Object> variables = new HashMap<Integer, Object>();
@@ -1027,5 +1033,26 @@ public class ItemFormMetadataDAO<K extends String,V extends ArrayList> extends E
         }
         return results;
 
+    }
+
+    /**
+     * Method check that crf version has items to SDV.
+     * 
+     * @param crfId
+     *            int
+     * @return boolean
+     */
+    public boolean hasItemsToSDV(int crfId) {
+        boolean has = false;
+        unsetTypeExpected();
+        setTypeExpected(1, TypeNames.BOOL);
+        HashMap variables = new HashMap();
+        variables.put(1, crfId);
+        ArrayList rows = select(digester.getQuery("hasItemsToSDV"), variables);
+        Iterator it = rows.iterator();
+        if (it.hasNext()) {
+            has = getBooleanFromRow((HashMap) it.next(), "has");
+        }
+        return has;
     }
 }

@@ -44,7 +44,11 @@ public class SubjectEventStatus extends Term implements Comparable {
 
     public static final SubjectEventStatus SIGNED = new SubjectEventStatus(8, "signed");
 
-    private static final SubjectEventStatus[] members = { SCHEDULED, NOT_SCHEDULED, DATA_ENTRY_STARTED, COMPLETED, STOPPED, SKIPPED, SIGNED, LOCKED };
+    public static final SubjectEventStatus SOURCE_DATA_VERIFIED = new SubjectEventStatus(9, "source_data_verified");
+
+    public static final SubjectEventStatus REMOVED = new SubjectEventStatus(10, "removed");
+
+    private static final SubjectEventStatus[] members = { SCHEDULED, NOT_SCHEDULED, DATA_ENTRY_STARTED, COMPLETED, STOPPED, SKIPPED, SIGNED, LOCKED, SOURCE_DATA_VERIFIED, REMOVED };
 
     private static List list = Arrays.asList(members);
 
@@ -60,6 +64,8 @@ public class SubjectEventStatus extends Term implements Comparable {
         membersMap.put(6, "skipped");
         membersMap.put(7, "locked");
         membersMap.put(8, "signed");
+        membersMap.put(9, "source_data_verified");
+        membersMap.put(10, "removed");
     }
 
     public boolean isInvalid() {
@@ -79,7 +85,7 @@ public class SubjectEventStatus extends Term implements Comparable {
     }
 
     public boolean isCompleted() {
-        return this == SubjectEventStatus.COMPLETED;
+        return this == SubjectEventStatus.COMPLETED || this == SubjectEventStatus.SOURCE_DATA_VERIFIED;
     }
 
     public boolean isStopped() {
@@ -96,6 +102,14 @@ public class SubjectEventStatus extends Term implements Comparable {
 
     public boolean isSigned() {
         return this == SubjectEventStatus.SIGNED;
+    }
+
+    public boolean isSourceDataVerified() {
+        return this == SubjectEventStatus.SOURCE_DATA_VERIFIED;
+    }
+
+    public boolean isRemoved() {
+        return this == SubjectEventStatus.REMOVED;
     }
 
     private SubjectEventStatus(int id, String name) {

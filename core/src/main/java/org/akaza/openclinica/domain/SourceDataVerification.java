@@ -5,13 +5,14 @@ import org.akaza.openclinica.i18n.util.ResourceBundleProvider;
 
 import java.util.HashMap;
 import java.util.ResourceBundle;
+import java.util.ArrayList;
 
 /**
  * An enum that represents an Event definition's  requirement for SourceDataVerification.
  */
 public enum SourceDataVerification implements CodedEnum {
 
-    AllREQUIRED(1, "100percent_required"), PARTIALREQUIRED(2, "partial_required"), NOTREQUIRED(3, "not_required"), NOTAPPLICABLE(4, "not_applicable");
+    AllREQUIRED(1, "100percent_required"), PARTIALREQUIRED(2, "specificItems"), NOTREQUIRED(3, "not_required"), NOTAPPLICABLE(4, "not_applicable");
 
     private int code;
     private String description;
@@ -84,5 +85,27 @@ public enum SourceDataVerification implements CodedEnum {
      */
     public String getName() {
         return this.name();
+    }
+
+    /**
+     * Method that fills sdv statuses.
+     * 
+     * @param sdvOptions
+     *            ArrayList<SourceDataVerification>
+     * @param hasItemsToSDV
+     *            boolean
+     */
+    public static void fillSDVStatuses(ArrayList<SourceDataVerification> sdvOptions, boolean hasItemsToSDV) {
+        sdvOptions.clear();
+        if (!hasItemsToSDV) {
+            sdvOptions.add(SourceDataVerification.AllREQUIRED);
+        }
+        sdvOptions.add(SourceDataVerification.PARTIALREQUIRED);
+        if (!hasItemsToSDV) {
+            sdvOptions.add(SourceDataVerification.NOTREQUIRED);
+        }
+        if (!hasItemsToSDV) {
+            sdvOptions.add(SourceDataVerification.NOTAPPLICABLE);
+        }
     }
 }

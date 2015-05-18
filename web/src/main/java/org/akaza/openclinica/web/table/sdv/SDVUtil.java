@@ -939,8 +939,12 @@ public class SDVUtil {
             //studySubjectBean.getSecondaryLabel()
             tempSDVBean.setSecondaryId(studySubjectBean.getSecondaryLabel());
 
-            String statusName = studySubjectBean.getStatus().getName();
-            int statusId = studySubjectBean.getStatus().getId();
+            String statusName = null;
+            int statusId = 0;
+            if (studySubjectBean.getStatus() != null) {
+                statusName = studySubjectBean.getStatus().getName();
+                statusId = studySubjectBean.getStatus().getId();
+            }
 
             if (statusName != null) {
                 tempSDVBean.setStudySubjectStatus(statusName);

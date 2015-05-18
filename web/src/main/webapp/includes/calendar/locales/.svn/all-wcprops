@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/clincapture/!svn/ver/2632/trunk/web/src/main/webapp/includes/calendar/locales
+END
+datepicker-ja.js
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/clincapture/!svn/ver/2286/trunk/web/src/main/webapp/includes/calendar/locales/datepicker-ja.js
+END
+datepicker-pl.js
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/clincapture/!svn/ver/2286/trunk/web/src/main/webapp/includes/calendar/locales/datepicker-pl.js
+END
+datepicker-zh.js
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/clincapture/!svn/ver/2286/trunk/web/src/main/webapp/includes/calendar/locales/datepicker-zh.js
+END
+datepicker-ru.js
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/clincapture/!svn/ver/2286/trunk/web/src/main/webapp/includes/calendar/locales/datepicker-ru.js
+END
+datepicker-es.js
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/clincapture/!svn/ver/2632/trunk/web/src/main/webapp/includes/calendar/locales/datepicker-es.js
+END
+datepicker-fr.js
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/clincapture/!svn/ver/2286/trunk/web/src/main/webapp/includes/calendar/locales/datepicker-fr.js
+END
+datepicker-de.js
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/clincapture/!svn/ver/2286/trunk/web/src/main/webapp/includes/calendar/locales/datepicker-de.js
+END

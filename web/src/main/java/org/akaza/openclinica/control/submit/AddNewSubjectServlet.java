@@ -942,12 +942,12 @@ public class AddNewSubjectServlet extends SecureController {
      */
     public static void saveFieldNotes(String field, FormDiscrepancyNotes notes, DiscrepancyNoteDAO dndao, int entityId, String entityType, StudyBean sb) {
     	
-    	 saveFieldNotes( field,  notes,  dndao,  entityId,  entityType,  sb, -1) ;
+    	 saveFieldNotes( field,  notes,  dndao,  entityId,  entityType,  sb, -1, false) ;
 	
     	}
     public static void saveFieldNotes(String field, FormDiscrepancyNotes notes, 
     		DiscrepancyNoteDAO dndao, int entityId, String entityType, StudyBean sb,
-    		int event_crf_id) {
+    		int event_crf_id, boolean isCc) {
 
         if (notes == null || dndao == null || sb == null) {
             // logger.info("AddNewSubjectServlet,saveFieldNotes:parameter is
@@ -990,8 +990,15 @@ public class AddNewSubjectServlet extends SecureController {
                 
             }
             // << tbh 05/2010 second fix to try out queries
-            dnb = (DiscrepancyNoteBean) dndao.create(dnb);
-            dndao.createMapping(dnb);
+            if (isCc) {
+                if (dndao.findByPK(dnb.getId()).getId() == 0) {
+                    dnb = (DiscrepancyNoteBean) dndao.create(dnb);
+                    dndao.createMapping(dnb);
+                }
+            } else {
+                dnb = (DiscrepancyNoteBean) dndao.create(dnb);
+                dndao.createMapping(dnb);
+            }
 
             if (dnb.getParentDnId() == 0) {
                 // see issue 2659 this is a new thread, we will create two notes
@@ -1003,9 +1010,18 @@ public class AddNewSubjectServlet extends SecureController {
                 dndao.createMapping(dnb);
             } else if(dnb.getParentDnId()>0){
                 DiscrepancyNoteBean parentNote = (DiscrepancyNoteBean)dndao.findByPK(dnb.getParentDnId());
-                if(dnb.getDiscrepancyNoteTypeId()==parentNote.getDiscrepancyNoteTypeId() && dnb.getResolutionStatusId()!=parentNote.getResolutionStatusId()) {
-                    parentNote.setResolutionStatusId(dnb.getResolutionStatusId());
-                    dndao.update(parentNote);
+                if (isCc) {
+                   if (dnb.getDiscrepancyNoteTypeId() == parentNote.getDiscrepancyNoteTypeId()
+                        && dnb.getResolutionStatusId() != parentNote.getResolutionStatusId()
+                        && parentNote.getDiscrepancyNoteTypeId() != DiscrepancyNoteType.REASON_FOR_CHANGE.getId()) {
+                        parentNote.setResolutionStatusId(dnb.getResolutionStatusId());
+                        dndao.update(parentNote);
+                    } 
+                } else {
+                    if(dnb.getDiscrepancyNoteTypeId()==parentNote.getDiscrepancyNoteTypeId() && dnb.getResolutionStatusId()!=parentNote.getResolutionStatusId()) {
+                        parentNote.setResolutionStatusId(dnb.getResolutionStatusId());
+                        dndao.update(parentNote);
+                    }
                 }
             }
         }

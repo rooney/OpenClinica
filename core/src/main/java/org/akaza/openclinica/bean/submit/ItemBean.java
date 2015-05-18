@@ -11,6 +11,7 @@ import org.akaza.openclinica.bean.core.AuditableEntityBean;
 import org.akaza.openclinica.bean.core.ItemDataType;
 import org.akaza.openclinica.bean.oid.ItemOidGenerator;
 import org.akaza.openclinica.bean.oid.OidGenerator;
+import org.akaza.openclinica.bean.extract.SasNameValidator;
 
 import java.util.ArrayList;
 
@@ -50,6 +51,7 @@ public class ItemBean extends AuditableEntityBean implements Comparable {
         result = prime * result + (selected ? 1231 : 1237);
         result = prime * result + statusId;
         result = prime * result + ((units == null) ? 0 : units.hashCode());
+        result = prime * result + ((sasName == null) ? 0 : sasName.hashCode());
         return result;
     }
 
@@ -126,6 +128,8 @@ public class ItemBean extends AuditableEntityBean implements Comparable {
                 return false;
         } else if (!units.equals(other.units))
             return false;
+        else if (!sasName.equals(other.sasName))
+            return false;
         return true;
     }
 
@@ -148,6 +152,8 @@ public class ItemBean extends AuditableEntityBean implements Comparable {
 
     private String oid;
     private OidGenerator oidGenerator;
+
+    private String sasName = "";
 
     private String datasetItemMapKey = ""; // which is
 
@@ -416,5 +422,17 @@ public class ItemBean extends AuditableEntityBean implements Comparable {
 
     public void setDefId(int defId) {
         this.defId = defId;
+    }
+
+    public String getSasName() {
+        if(sasName.isEmpty()) {
+            SasNameValidator sasNameValidator = new SasNameValidator();
+            this.sasName = sasNameValidator.getValidName(this.getName());
+        }
+        return sasName;
+    }
+
+    public void setSasName(String sasName) {
+        this.sasName = sasName;
     }
 }

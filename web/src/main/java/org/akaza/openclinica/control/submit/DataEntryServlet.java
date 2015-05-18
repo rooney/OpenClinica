@@ -123,6 +123,7 @@ import org.apache.commons.lang.text.StrSubstitutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.akaza.openclinica.util.CrfShortcutsAnalyzer;
 
 /**
  * @author ssachs
@@ -234,6 +235,7 @@ public abstract class DataEntryServlet extends CoreSecureController {
      * Session attribute, and will be followed by crf_version_id
      */
     public static final String CV_INSTANT_META = "cvInstantMeta";
+    public static final String STUDY = "study";
 
     private DataSource dataSource;
 
@@ -1601,7 +1603,7 @@ public abstract class DataEntryServlet extends CoreSecureController {
                                 inputName = displayItem.getFieldName();
                               if(writeDN)
                                 {
-                            	  AddNewSubjectServlet.saveFieldNotes(inputName, fdn, dndao, displayItem.getData().getId(), "itemData", currentStudy, ecb.getId());
+                            	  AddNewSubjectServlet.saveFieldNotes(inputName, fdn, dndao, displayItem.getData().getId(), "itemData", currentStudy, ecb.getId(), false);
                                 }
                                 success = success && temp;
                             }
@@ -1647,7 +1649,7 @@ public abstract class DataEntryServlet extends CoreSecureController {
                         String inputName = getInputName(dib);
                         LOGGER.trace("3 - found input name: " + inputName);
                         if(writeDN )
-                        AddNewSubjectServlet.saveFieldNotes(inputName, fdn, dndao, dib.getData().getId(), "itemData", currentStudy, ecb.getId());
+                        AddNewSubjectServlet.saveFieldNotes(inputName, fdn, dndao, dib.getData().getId(), "itemData", currentStudy, ecb.getId(), false);
 
                         success = success && temp;
 
@@ -1665,7 +1667,7 @@ public abstract class DataEntryServlet extends CoreSecureController {
                             }
                             inputName = getInputName(child);
                             if( writeDN)
-                            AddNewSubjectServlet.saveFieldNotes(inputName, fdn, dndao, child.getData().getId(), "itemData", currentStudy, ecb.getId());
+                            AddNewSubjectServlet.saveFieldNotes(inputName, fdn, dndao, child.getData().getId(), "itemData", currentStudy, ecb.getId(), false);
                             success = success && temp;
                         }
                     }
@@ -3858,6 +3860,215 @@ public abstract class DataEntryServlet extends CoreSecureController {
         return section;
     }
 
+    protected DisplaySectionBean populateNotesWithDBNoteCountsNew(FormDiscrepancyNotes discNotes,
+            List<DiscrepancyNoteThread> noteThreads, DisplaySectionBean section, HttpServletRequest request, CrfShortcutsAnalyzer crfShortcutsAnalyzer) {
+        DynamicsMetadataService dynamicsMetadataService = getItemMetadataService();
+        StudyBean currentStudy = (StudyBean) request.getSession().getAttribute(STUDY);
+        DiscrepancyNoteUtil dNoteUtil = new DiscrepancyNoteUtil();
+        DiscrepancyNoteDAO dndao = new DiscrepancyNoteDAO(getDataSource());
+        ItemFormMetadataDAO ifmdao = new ItemFormMetadataDAO(getDataSource());
+        EventCRFBean ecb = (EventCRFBean) request.getAttribute(INPUT_EVENT_CRF);
+
+        List<DiscrepancyNoteBean> ecNotes = dndao.findEventCRFDNotesFromEventCRF(ecb);
+        List<DiscrepancyNoteBean> existingNameNotes = new ArrayList();
+        List<DiscrepancyNoteBean> existingIntrvDateNotes = new ArrayList();
+
+        // ecNotes = filterNotesByUserRole(ecNotes, request);
+
+        for (int i = 0; i < ecNotes.size(); i++) {
+            DiscrepancyNoteBean dn = ecNotes.get(i);
+            if (INTERVIEWER_NAME.equalsIgnoreCase(dn.getColumn())) {
+                discNotes.setNumExistingFieldNotes(INPUT_INTERVIEWER, 1);
+                request.setAttribute("hasNameNote", "yes");
+                request.setAttribute(INTERVIEWER_NAME_NOTE, dn);
+                if (dn.getParentDnId() == 0) {
+                    existingNameNotes.add(dn);
+                }
+            }
+
+            if (DATE_INTERVIEWED.equalsIgnoreCase(dn.getColumn())) {
+                discNotes.setNumExistingFieldNotes(INPUT_INTERVIEW_DATE, 1);
+                request.setAttribute("hasDateNote", "yes");
+                request.setAttribute(INTERVIEWER_DATE_NOTE, dn);
+                if (dn.getParentDnId() == 0) {
+                    existingIntrvDateNotes.add(dn);
+                }
+            }
+        }
+
+        ArrayList notes = new ArrayList(discNotes.getNotes(INPUT_INTERVIEWER));
+        notes.addAll(existingNameNotes);
+        noteThreads = dNoteUtil.createThreadsOfParents(notes, getDataSource(), currentStudy, null, -1, true);
+        crfShortcutsAnalyzer.prepareCrfShortcutAnchors(crfShortcutsAnalyzer.getInterviewerDisplayItemBean(),
+                noteThreads, false);
+
+        notes = new ArrayList(discNotes.getNotes(INPUT_INTERVIEW_DATE));
+        notes.addAll(existingIntrvDateNotes);
+        noteThreads = dNoteUtil.createThreadsOfParents(notes, getDataSource(), currentStudy, null, -1, true);
+        crfShortcutsAnalyzer.prepareCrfShortcutAnchors(crfShortcutsAnalyzer.getInterviewDateDisplayItemBean(),
+                noteThreads, false);
+
+        setToolTipEventNotes(request);
+
+        request.setAttribute("existingNameNotes", existingNameNotes);
+        request.setAttribute("hasNameNote", existingNameNotes.size() > 0 ? "yes" : "");
+        request.setAttribute("nameNoteResStatus",
+                DiscrepancyNoteUtil.getDiscrepancyNoteResolutionStatus(existingNameNotes));
+
+        request.setAttribute("existingIntrvDateNotes", existingIntrvDateNotes);
+        request.setAttribute("hasDateNote", existingIntrvDateNotes.size() > 0 ? "yes" : "");
+        request.setAttribute("IntrvDateNoteResStatus",
+                DiscrepancyNoteUtil.getDiscrepancyNoteResolutionStatus(existingIntrvDateNotes));
+
+        Map<Integer, List<DiscrepancyNoteBean>> itemDataDNCache = new HashMap<Integer, List<DiscrepancyNoteBean>>();
+        List<DiscrepancyNoteBean> discrepancyNoteBeanList = dndao.findAllByEventCrfId(ecb.getId());
+        for (DiscrepancyNoteBean discrepancyNoteBean : discrepancyNoteBeanList) {
+            List<DiscrepancyNoteBean> dnList = itemDataDNCache.get(discrepancyNoteBean.getEntityId());
+            if (dnList == null) {
+                dnList = new ArrayList<DiscrepancyNoteBean>();
+                itemDataDNCache.put(discrepancyNoteBean.getEntityId(), dnList);
+            }
+            dnList.add(discrepancyNoteBean);
+        }
+
+        Map<Integer, List<DiscrepancyNoteBean>> toolTipItemDataDNCache = new HashMap<Integer, List<DiscrepancyNoteBean>>();
+        List<DiscrepancyNoteBean> toolTipDiscrepancyNoteBeanList = dndao.findExistingNotesForToolTipByEventCrfId(ecb
+                .getId());
+        for (DiscrepancyNoteBean discrepancyNoteBean : toolTipDiscrepancyNoteBeanList) {
+            List<DiscrepancyNoteBean> dnList = toolTipItemDataDNCache.get(discrepancyNoteBean.getEntityId());
+            if (dnList == null) {
+                dnList = new ArrayList<DiscrepancyNoteBean>();
+                toolTipItemDataDNCache.put(discrepancyNoteBean.getEntityId(), dnList);
+            }
+            dnList.add(discrepancyNoteBean);
+        }
+
+        List<DisplayItemWithGroupBean> allItems = section.getDisplayItemGroups();
+        LOGGER.debug("start to populate notes: " + section.getDisplayItemGroups().size());
+        for (int k = 0; k < allItems.size(); k++) {
+            DisplayItemWithGroupBean itemWithGroup = allItems.get(k);
+
+            if (itemWithGroup.isInGroup()) {
+                LOGGER.debug("group item DNote...");
+                List<DisplayItemGroupBean> digbs = itemWithGroup.getItemGroups();
+                LOGGER.trace("digbs size: " + digbs.size());
+                for (int i = 0; i < digbs.size(); i++) {
+                    DisplayItemGroupBean displayGroup = digbs.get(i);
+                    List<DisplayItemBean> items = displayGroup.getItems();
+                    for (int j = 0; j < items.size(); j++) {
+                        DisplayItemBean dib = items.get(j);
+                        String inputName;
+                        if (i == 0) {
+                            inputName = getGroupItemInputName(displayGroup, i, dib);
+                        } else {
+                            inputName = getGroupItemManualInputName(displayGroup, i, dib);
+                        }
+
+                        int itemDataId = 0;
+                        if (i <= itemWithGroup.getDbItemGroups().size() - 1) {
+                            itemDataId = dib.getData().getId();
+                        } else {
+                            dib.getData().setId(0);
+                        }
+
+                        List<DiscrepancyNoteBean> toolTipDNotes = toolTipItemDataDNCache.get(itemDataId);
+                        toolTipDNotes = toolTipDNotes == null ? new ArrayList() : new ArrayList(toolTipDNotes);
+
+                        List dbNotes = itemDataDNCache.get(itemDataId);
+                        List parentNotes = dbNotes == null ? new ArrayList() : new ArrayList(dbNotes);
+                        dbNotes = dbNotes == null ? new ArrayList() : new ArrayList(dbNotes);
+
+                        // dbNotes = filterNotesByUserRole(dbNotes, request);
+
+                        notes = new ArrayList(discNotes.getNotes(inputName));
+                        notes.addAll(dbNotes);
+                        noteThreads = dNoteUtil.createThreadsOfParents(notes, getDataSource(), currentStudy, null, -1, true);
+                        discNotes.setNumExistingFieldNotes(inputName, dbNotes.size());
+                        dib.setNumDiscrepancyNotes(dbNotes.size() + notes.size());
+                        dib.setDiscrepancyNoteStatus(getDiscrepancyNoteResolutionStatus(itemDataId,
+                                discNotes.getNotes(inputName)));
+                        dib = setTotalsNew(dib, itemDataId, toolTipDNotes, parentNotes, notes, ecb.getId(), request);
+                        crfShortcutsAnalyzer.prepareCrfShortcutAnchors(dib, noteThreads, false);
+                        LOGGER.debug("dib note size:" + dib.getNumDiscrepancyNotes() + " " + dib.getData().getId()
+                                + " " + inputName);
+                        items.set(j, dib);
+                    }
+                    displayGroup.setItems(items);
+                    digbs.set(i, displayGroup);
+                }
+                itemWithGroup.setItemGroups(digbs);
+
+            } else {
+                LOGGER.trace("single item db note");
+                DisplayItemBean dib = itemWithGroup.getSingleItem();
+                int itemDataId = dib.getData().getId();
+                int itemId = dib.getItem().getId();
+                String inputFieldName = "input" + itemId;
+
+                List<DiscrepancyNoteBean> toolTipDNotes = toolTipItemDataDNCache.get(itemDataId);
+                toolTipDNotes = toolTipDNotes == null ? new ArrayList() : new ArrayList(toolTipDNotes);
+
+                List dbNotes = itemDataDNCache.get(itemDataId);
+                List parentNotes = dbNotes == null ? new ArrayList() : new ArrayList(dbNotes);
+                dbNotes = dbNotes == null ? new ArrayList() : new ArrayList(dbNotes);
+
+                notes = new ArrayList(discNotes.getNotes(inputFieldName));
+
+                // dbNotes = filterNotesByUserRole(dbNotes, request);
+
+                notes.addAll(dbNotes);
+                discNotes.setNumExistingFieldNotes(inputFieldName, dbNotes.size());
+                dib.setNumDiscrepancyNotes(dbNotes.size() + notes.size());
+                dib.setDiscrepancyNoteStatus(getDiscrepancyNoteResolutionStatus(itemDataId,
+                        discNotes.getNotes(inputFieldName)));
+                dib = setTotalsNew(dib, itemDataId, toolTipDNotes, parentNotes, discNotes.getNotes(inputFieldName),
+                        ecb.getId(), request);
+                noteThreads = dNoteUtil.createThreadsOfParents(notes, getDataSource(), currentStudy, null, -1, true);
+                crfShortcutsAnalyzer.prepareCrfShortcutAnchors(dib, noteThreads, false);
+
+                ArrayList childItems = dib.getChildren();
+
+                for (int j = 0; j < childItems.size(); j++) {
+                    DisplayItemBean child = (DisplayItemBean) childItems.get(j);
+                    int childItemDataId = child.getData().getId();
+                    int childItemId = child.getItem().getId();
+                    String childInputFieldName = "input" + childItemId;
+                    LOGGER.debug("*** setting " + childInputFieldName);
+
+                    List<DiscrepancyNoteBean> toolTipChildDNotes = toolTipItemDataDNCache.get(childItemDataId);
+                    toolTipChildDNotes = toolTipChildDNotes == null ? new ArrayList() : new ArrayList(
+                            toolTipChildDNotes);
+
+                    List dbChildNotes = itemDataDNCache.get(childItemDataId);
+                    List parentChildNotes = dbChildNotes == null ? new ArrayList() : new ArrayList(dbChildNotes);
+                    dbChildNotes = dbChildNotes == null ? new ArrayList() : new ArrayList(dbChildNotes);
+
+                    List childNotes = new ArrayList(discNotes.getNotes(inputFieldName));
+
+                    // dbChildNotes = filterNotesByUserRole(dbChildNotes, request);
+
+                    childNotes.addAll(dbNotes);
+                    noteThreads = dNoteUtil
+                            .createThreadsOfParents(notes, getDataSource(), currentStudy, null, -1, true);
+                    discNotes.setNumExistingFieldNotes(childInputFieldName, dbChildNotes.size());
+                    child.setNumDiscrepancyNotes(dbChildNotes.size() + childNotes.size());
+                    child.setDiscrepancyNoteStatus(getDiscrepancyNoteResolutionStatus(childItemDataId,
+                            discNotes.getNotes(childInputFieldName)));
+                    child = setTotalsNew(child, childItemDataId, toolTipChildDNotes, parentChildNotes,
+                            discNotes.getNotes(childInputFieldName), ecb.getId(), request);
+                    crfShortcutsAnalyzer.prepareCrfShortcutAnchors(child, noteThreads, false);
+                    childItems.set(j, child);
+                }
+                dib.setChildren(childItems);
+                itemWithGroup.setSingleItem(runDynamicsItemCheck(dib, null, request));
+            }
+            allItems.set(k, itemWithGroup);
+        }
+
+        section.setDisplayItemGroups(allItems);
+        return section;
+    }
+
     private void setToolTipEventNotes(HttpServletRequest request) {
    long t = System.currentTimeMillis();
 
@@ -4437,7 +4648,7 @@ public abstract class DataEntryServlet extends CoreSecureController {
                 // to arrange item groups and other single items, the ordinal of
                 // a item group will be the ordinal of the first item in this
                 // group
-                DisplayItemBean firstItem = itemGroup.getItems().get(0);
+                DisplayItemBean firstItem = getDisplayItemBeanForFirstItemDataBean(itemGroup.getItems(), data);
 
                 // so we are either checking the first or the last item, BUT ONLY ONCE
                 newOne.setPageNumberLabel(firstItem.getMetadata().getPageNumberLabel());
@@ -4486,15 +4697,170 @@ public abstract class DataEntryServlet extends CoreSecureController {
          return displayItemWithGroups;
     }
 
-  private Map getAllActive(List<ItemDataBean>al){
-      Map returnMap = new HashMap<String,ItemDataBean>();
+    protected List<DisplayItemWithGroupBean> createItemWithGroupsNew(DisplaySectionBean dsb, boolean hasItemGroup, int eventCRFDefId, HttpServletRequest request, boolean isSubmitted) {
+        HttpSession session = request.getSession();
+        List<DisplayItemWithGroupBean> displayItemWithGroups = new ArrayList<DisplayItemWithGroupBean>();
+        EventCRFBean ecb = (EventCRFBean)request.getAttribute(INPUT_EVENT_CRF);
+        ItemDAO idao = new ItemDAO(getDataSource());
+        SectionBean sb = (SectionBean)request.getAttribute(SECTION_BEAN);
+        EventDefinitionCRFBean edcb = (EventDefinitionCRFBean)request.getAttribute(EVENT_DEF_CRF_BEAN);
+        // BWP>> Get a List<String> of any null values such as NA or NI
+        // method returns null values as a List<String>
+        // >>BWP
+        ArrayList items = dsb.getItems();
+        // For adding null values to display items
+        FormBeanUtil formBeanUtil = new FormBeanUtil();
+        List<String> nullValuesList =  formBeanUtil.getNullValuesByEventCRFDefId(eventCRFDefId, getDataSource());
 
-      for(ItemDataBean itBean:al){
-          if(itBean!=null)
-          returnMap.put(new String(itBean.getItemId()+","+itBean.getOrdinal()), itBean);
-      }
-      return returnMap;
-  }
+        LOGGER.trace("single items size: " + items.size());
+        for (int i = 0; i < items.size(); i++) {
+            DisplayItemBean item = (DisplayItemBean) items.get(i);
+            DisplayItemWithGroupBean newOne = new DisplayItemWithGroupBean();
+            newOne.setSingleItem(runDynamicsItemCheck(item, null, request));
+            newOne.setOrdinal(item.getMetadata().getOrdinal());
+            newOne.setInGroup(false);
+            newOne.setPageNumberLabel(item.getMetadata().getPageNumberLabel());
+            displayItemWithGroups.add(newOne);
+            // logger.trace("just added on line 1979:
+            // "+newOne.getSingleItem().getData().getValue());
+        }
+
+        if (hasItemGroup) {
+            ItemDataDAO iddao = new ItemDataDAO(getDataSource(),locale);
+            ItemFormMetadataDAO metaDao = new ItemFormMetadataDAO(getDataSource());
+            ArrayList<ItemDataBean> data = iddao.findAllBySectionIdAndEventCRFId(sb.getId(), ecb.getId());
+            HashMap<String,ItemDataBean> dataMap = (HashMap<String, ItemDataBean>) getAllActive(data);
+            Map<Integer, List<ItemDataBean>> itemDataCache = FormBeanUtil.getItemDataCache(data, false);
+            Map<Integer, ItemFormMetadataBean> itemFormMetadataCache = FormBeanUtil.getItemFormMetadataCache(
+                    ecb.getCRFVersionId(), metaDao);
+
+            if (data != null && data.size() > 0) {
+                session.setAttribute(HAS_DATA_FLAG, true);
+            }
+            LOGGER.trace("found data: " + data.size());
+            LOGGER.trace("data.toString: " + data.toString());
+
+            for (DisplayItemGroupBean itemGroup : dsb.getDisplayFormGroups()) {
+                LOGGER.debug("found one itemGroup");
+                DisplayItemWithGroupBean newOne = new DisplayItemWithGroupBean();
+                // to arrange item groups and other single items, the ordinal of
+                // a item group will be the ordinal of the first item in this
+                // group
+                DisplayItemBean firstItem = getDisplayItemBeanForFirstItemDataBean(itemGroup.getItems(), data);
+
+                // so we are either checking the first or the last item, BUT ONLY ONCE
+                newOne.setPageNumberLabel(firstItem.getMetadata().getPageNumberLabel());
+
+                newOne.setItemGroup(itemGroup);
+                newOne.setInGroup(true);
+                newOne.setOrdinal(itemGroup.getGroupMetaBean().getOrdinal());
+
+                List<ItemBean> itBeans = idao.findAllItemsByGroupIdOrdered(itemGroup.getItemGroupBean().getId(), sb.getCRFVersionId());
+
+                boolean hasData = false;
+                int checkAllColumns = 0;
+                
+                // if a group has repetitions, the number of data of
+                // first item should be same as the row number
+                for (int i = 0; i < data.size(); i++) {
+                    ItemDataBean idb = (ItemDataBean) data.get(i);
+
+                    LOGGER.debug("check all columns: " + checkAllColumns);
+                    if (idb.getItemId() == firstItem.getItem().getId()) {
+                        hasData = true;
+                        LOGGER.debug("set has data to --TRUE--");
+                        checkAllColumns = 0;
+                        // so that we only fire once a row
+                        LOGGER.debug("has data set to true");
+                        DisplayItemGroupBean digb = new DisplayItemGroupBean();
+                        // always get a fresh copy for items, may use other
+                        // better way to
+                        // do deep copy, like clone
+                        List<DisplayItemBean> dibs = FormBeanUtil
+                                .getDisplayBeansFromItemsNew(itBeans, itemDataCache, itemFormMetadataCache, ecb,
+                                        sb.getId(), edcb, idb.getOrdinal(), getServletContext());
+
+                        digb.setItems(dibs);
+                        LOGGER.trace("set with dibs list of : " + dibs.size());
+                        digb.setGroupMetaBean(runDynamicsCheck(itemGroup.getGroupMetaBean(), request));
+                        digb.setItemGroupBean(itemGroup.getItemGroupBean());
+                        newOne.getItemGroups().add(digb);
+                        newOne.getDbItemGroups().add(digb);
+                    }
+                }
+                
+                List<DisplayItemGroupBean> groupRows = newOne.getItemGroups();
+                LOGGER.trace("how many group rows:" + groupRows.size());
+                LOGGER.trace("how big is the data:" + data.size());
+
+            if (hasData) {
+                 //TODO: fix the group_has_data flag on bean not on session
+                session.setAttribute(GROUP_HAS_DATA, Boolean.TRUE);
+                // iterate through the group rows, set data for each item in
+                // the group
+                for (int i = 0; i < groupRows.size(); i++) {
+                    DisplayItemGroupBean displayGroup = groupRows.get(i);
+                    for (DisplayItemBean dib : displayGroup.getItems()) {
+                        for (int j = 0; j < data.size(); j++) {
+                            ItemDataBean idb = (ItemDataBean) data.get(j);
+                            if (idb.getItemId() == dib.getItem().getId()
+                                    && idb.getOrdinal() == dib.getData().getOrdinal() && !idb.isSelected()) {
+                                idb.setSelected(true);
+                                dib.setData(idb);
+                                LOGGER.debug("--> set data " + idb.getId() + ": " + idb.getValue());
+
+                                if (shouldLoadDBValues(dib,
+                                        getServletPage(request))) {
+                                    LOGGER.debug("+++should load db values is true, set value");
+                                    dib.loadDBValue();
+                                    LOGGER.debug("+++data loaded: " + idb.getName() + ": " + idb.getOrdinal() + " "
+                                            + idb.getValue());
+                                    LOGGER.debug("+++try dib OID: " + dib.getItem().getOid());
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                }
+            } else {
+                session.setAttribute(GROUP_HAS_DATA, Boolean.FALSE);
+                // no data, still add a blank row for displaying
+                if ( nullValuesList != null && nullValuesList.size() >0){
+                    LOGGER.trace("set with nullValuesList of : " + nullValuesList);
+                }
+                List<DisplayItemBean> dibs = FormBeanUtil.getDisplayBeansFromItemsNew(itBeans, itemDataCache,
+                            itemFormMetadataCache, ecb, sb.getId(), nullValuesList, getServletContext());
+
+                DisplayItemGroupBean digb2 = new DisplayItemGroupBean();
+
+                digb2.setItems(dibs);
+                digb2.setEditFlag("initial");
+                digb2.setGroupMetaBean(itemGroup.getGroupMetaBean());
+                digb2.setItemGroupBean(itemGroup.getItemGroupBean());
+                newOne.getItemGroups().add(digb2);
+                newOne.getDbItemGroups().add(digb2);
+            }
+
+            displayItemWithGroups.add(newOne);
+            }
+
+        }// if hasItemGroup
+
+        Collections.sort(displayItemWithGroups);
+
+        return displayItemWithGroups;
+    }
+
+    private Map getAllActive(List<ItemDataBean>al){
+        Map returnMap = new HashMap<String,ItemDataBean>();
+
+        for(ItemDataBean itBean:al){
+            if(itBean!=null)
+            returnMap.put(new String(itBean.getItemId()+","+itBean.getOrdinal()), itBean);
+        }
+        return returnMap;
+    }
   	//@pgawade 30-May-2012 Fix for issue 13963 - added an extra parameter 'isSubmitted' to method buildMatrixForRepeatingGroups
     protected DisplayItemWithGroupBean buildMatrixForRepeatingGroups(DisplayItemWithGroupBean diwgb,
     		DisplayItemGroupBean itemGroup, EventCRFBean ecb,
@@ -5656,5 +6022,106 @@ String tempKey = idb.getItemId()+","+idb.getOrdinal();
         if(nonRepOri != null && nonRepOri.size()>0) {
             ins.itemsInstantUpdate(section.getDisplayItemGroups(), nonRepOri);
         }
+    }
+
+    private DisplayItemBean getDisplayItemBeanForFirstItemDataBean(List<DisplayItemBean> items,
+            List<ItemDataBean> dataItems) {
+        for (DisplayItemBean displayItemBean : items) {
+            for (ItemDataBean itemDataBean : dataItems) {
+                if (displayItemBean.getItem().getId() == itemDataBean.getItemId()) {
+                    return displayItemBean;
+                }
+            }
+        }
+        return items.get(0);
+    }
+
+    // protected DataEntryService getDataEntryService(ServletContext context) {
+    //     DataEntryService dataEntryService = (DataEntryService) SpringServletAccess.getApplicationContext(context)
+    //             .getBean("dataEntryService");
+    //     return dataEntryService;
+    // }
+
+    private boolean shouldLoadDBValues(DisplayItemBean dib, String servletPage) {
+        if (Page.ADMIN_EDIT_SERVLET.equals(servletPage)) {
+            if (dib.getData().getStatus() == null) {
+                return true;
+            }
+            if (!Status.UNAVAILABLE.equals(dib.getData().getStatus())) {
+                return false;
+            }
+        }
+
+        if (Page.DOUBLE_DATA_ENTRY_SERVLET.equals(servletPage)) {
+            if (dib.getEventDefinitionCRF().isEvaluatedCRF()) {
+                return true;
+            }
+            if (dib.getData().getStatus() == null || dib.getData().getStatus().equals(Status.UNAVAILABLE)) {
+                return true;
+            }
+            if (dib.getData().getStatus().equals(Status.PENDING)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private DisplayItemBean setTotalsNew(DisplayItemBean dib, int itemDataId, List<DiscrepancyNoteBean> toolTipDNotes,
+            List parentNotes, ArrayList<DiscrepancyNoteBean> notes, int ecbId, HttpServletRequest request) {
+
+        int totNew = 0, totRes = 0, totClosed = 0, totUpdated = 0, totNA = 0;
+        boolean hasOtherThread = false;
+
+        DiscrepancyNoteDAO dndao = new DiscrepancyNoteDAO(getDataSource());
+
+        // toolTipDNotes = filterNotesByUserRole(toolTipDNotes, request);
+        ArrayList<DiscrepancyNoteBean> newToolTipDNotes = new ArrayList(toolTipDNotes);
+        dib.setDiscrepancyNotes(newToolTipDNotes);
+
+        for (DiscrepancyNoteBean obj : dib.getDiscrepancyNotes()) {
+            DiscrepancyNoteBean note = obj;
+
+            if (note.getParentDnId() == 0) {
+                totNew++;
+            }
+        }
+
+        // Adding this to show the value of only parent threads on discrepancy notes tool tip
+        for (Object obj : parentNotes) {
+            DiscrepancyNoteBean note = (DiscrepancyNoteBean) obj;
+            /*
+             * We would only take the resolution status of the parent note of any note thread. If there are more than
+             * one note thread, the thread with the worst resolution status will be taken.
+             */
+
+            if (note.getParentDnId() == 0) {
+                if (hasOtherThread) {
+                    totNew++;
+                }
+                hasOtherThread = true;
+            }
+        }
+
+        AuditDAO adao = new AuditDAO(getDataSource());
+        ArrayList itemAuditEvents = adao.checkItemAuditEventsExist(dib.getItem().getId(), "item_data", ecbId);
+        if (itemAuditEvents.size() > 0) {
+            AuditBean itemFirstAudit = (AuditBean) itemAuditEvents.get(0);
+            String firstRFC = itemFirstAudit.getReasonForChange();
+            String oldValue = itemFirstAudit.getOldValue();
+            if (firstRFC != null && "initial value".equalsIgnoreCase(firstRFC)
+                    && (oldValue == null || oldValue.isEmpty())) {
+                dib.getData().setAuditLog(false);
+            } else {
+                dib.getData().setAuditLog(true);
+            }
+        }
+
+        dib.setTotNew(totNew); // totNew is used for parent thread count
+        dib.setTotRes(totRes);
+        dib.setTotUpdated(totUpdated);
+        dib.setTotClosed(totClosed);
+        dib.setTotNA(totNA);
+
+        return dib;
     }
 }

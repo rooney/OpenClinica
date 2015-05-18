@@ -29,6 +29,7 @@ import org.akaza.openclinica.dao.managestudy.StudyEventDAO;
 import org.akaza.openclinica.dao.managestudy.StudyEventDefinitionDAO;
 import org.akaza.openclinica.dao.service.StudyParameterValueDAO;
 import org.akaza.openclinica.dao.submit.CRFVersionDAO;
+import org.akaza.openclinica.dao.submit.ItemFormMetadataDAO;
 import org.akaza.openclinica.domain.SourceDataVerification;
 import org.akaza.openclinica.view.Page;
 import org.akaza.openclinica.web.InsufficientPermissionException;
@@ -88,8 +89,8 @@ public class InitUpdateEventDefinitionServlet extends SecureController {
 
     @Override
     public void processRequest() throws Exception {
-
         StudyEventDefinitionDAO sdao = new StudyEventDefinitionDAO(sm.getDataSource());
+        ItemFormMetadataDAO ifmdao = new ItemFormMetadataDAO(sm.getDataSource());
         String idString = request.getParameter("id");
         logger.info("definition id: " + idString);
         if (StringUtil.isBlank(idString)) {
@@ -99,7 +100,7 @@ public class InitUpdateEventDefinitionServlet extends SecureController {
             // definition id
             int defId = Integer.valueOf(idString.trim()).intValue();
             StudyEventDefinitionBean sed = (StudyEventDefinitionBean) sdao.findByPK(defId);
-            StudyParameterValueDAO spvdao = new StudyParameterValueDAO(sm.getDataSource());    
+            StudyParameterValueDAO spvdao = new StudyParameterValueDAO(sm.getDataSource());
             String participateFormStatus = spvdao.findByHandleAndStudy(sed.getStudyId(), "participantPortal").getValue();
             request.setAttribute("participateFormStatus",participateFormStatus );
 
@@ -128,21 +129,14 @@ public class InitUpdateEventDefinitionServlet extends SecureController {
                 edc.setNullFlags(processNullValues(edc));
                 CRFVersionBean defaultVersion = (CRFVersionBean) cvdao.findByPK(edc.getDefaultVersionId());
                 edc.setDefaultVersionName(defaultVersion.getName());
+                SourceDataVerification.fillSDVStatuses(edc.getSdvOptions(),
+                        ifmdao.hasItemsToSDV(crf.getId()));
                 newEventDefinitionCRFs.add(edc);
             }
-
             session.setAttribute("definition", sed);
             session.setAttribute("eventDefinitionCRFs", newEventDefinitionCRFs);
             // changed above to new list because static, in-place updating is
             // updating all EDCs, tbh 102007
-
-            ArrayList<String> sdvOptions = new ArrayList<String>();
-            sdvOptions.add(SourceDataVerification.AllREQUIRED.toString());
-            sdvOptions.add(SourceDataVerification.PARTIALREQUIRED.toString());
-            sdvOptions.add(SourceDataVerification.NOTREQUIRED.toString());
-            sdvOptions.add(SourceDataVerification.NOTAPPLICABLE.toString());
-            request.setAttribute("sdvOptions", sdvOptions);
-
             forwardPage(Page.UPDATE_EVENT_DEFINITION1);
         }
 

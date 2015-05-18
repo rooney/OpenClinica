@@ -46,6 +46,8 @@ public class DiscrepancyNoteDAO extends AuditableEntityDAO {
     // only applies to functions which return a single bean
     private boolean fetchMapping = false;
 
+    public static final int START_INDEX_TO_ADD_EXTRA_TYPES_EXPECTED = 12;
+
     /**
      * @return Returns the fetchMapping.
      */
@@ -2066,5 +2068,92 @@ public class DiscrepancyNoteDAO extends AuditableEntityDAO {
         } else {
             return null;
         }
+    }
+
+    /**
+     * Finds out if a specific Study Event has outstanding DNs, associated with Study Event properties or
+     * with Item Data beans within Event CRFs.
+     *
+     * @param seb StudyEventBean
+     * @return boolean
+     */
+    public boolean doesNotHaveOutstandingDNs(StudyEventBean seb) {
+        Integer count = null;
+        this.unsetTypeExpected();
+        this.setTypeExpected(1, TypeNames.INT);
+
+        HashMap variables = new HashMap();
+        variables.put(1, seb.getId());
+
+        ArrayList rows = select(digester.getQuery("countOfOutstandingDNsForStudyEvent"), variables);
+        rows.addAll(select(digester.getQuery("countOfOutstandingDNsForStudyEventFromStudyEventMap"), variables));
+        for (Object row : rows) {
+            count = (Integer) ((HashMap) row).get("count");
+            if (count != null && count > 0) {
+                break;
+            }
+        }
+
+        return count != null && count == 0;
+    }
+
+    /**
+     * Finds out if a specific Event CRF has outstanding DNs, associated with its properties or
+     * with Item Data beans within Event CRF.
+     *
+     * @param ecb EventCRFBean
+     * @return boolean
+     */
+    public boolean doesNotHaveOutstandingDNs(EventCRFBean ecb) {
+        Integer count = null;
+        this.unsetTypeExpected();
+        this.setTypeExpected(1, TypeNames.INT);
+
+        HashMap variables = new HashMap();
+        int index = 1;
+        variables.put(index++, ecb.getId());
+        variables.put(index, ecb.getId());
+
+        ArrayList rows = select(digester.getQuery("countOfOutstandingDNsForEventCrf"), variables);
+        Iterator it = rows.iterator();
+        if (it.hasNext()) {
+            count = (Integer) ((HashMap) it.next()).get("count");
+        }
+        return count != null && count == 0;
+    }
+
+    public ArrayList<DiscrepancyNoteBean> findAllByEventCrfId(int eventCrfId) {
+
+        this.setTypesExpected();
+        int index = START_INDEX_TO_ADD_EXTRA_TYPES_EXPECTED;
+        this.setTypeExpected(index, TypeNames.INT);
+
+        ArrayList<DiscrepancyNoteBean> returnedNotelist = new ArrayList<DiscrepancyNoteBean>();
+
+        HashMap variables = new HashMap();
+        variables.put(1, eventCrfId);
+
+        ArrayList<HashMap> rows = select(digester.getQuery("findAllByEventCrfId"), variables);
+        for (HashMap hm : rows) {
+            returnedNotelist.add((DiscrepancyNoteBean) getEntityFromHashMap(hm));
+        }
+        return returnedNotelist;
+    }
+
+    public ArrayList findExistingNotesForToolTipByEventCrfId(int eventCrfId) {
+        this.setTypesExpected();
+        ArrayList alist;
+        HashMap variables = new HashMap();
+        int index = 1;
+        variables.put(index++, eventCrfId);
+        variables.put(index++, eventCrfId);
+        variables.put(index++, eventCrfId);
+        variables.put(index, eventCrfId);
+        alist = this.select(digester.getQuery("findExistingNotesForToolTipByEventCrfId"), variables);
+        ArrayList<DiscrepancyNoteBean> al = new ArrayList<DiscrepancyNoteBean>();
+        for (Object hm : alist) {
+            al.add((DiscrepancyNoteBean) getEntityFromHashMap((HashMap) hm));
+        }
+        return al;
     }
 }

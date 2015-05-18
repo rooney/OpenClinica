@@ -29,6 +29,7 @@ public class ItemDataBean extends AuditableEntityBean {
         result = prime * result + ordinal;
         result = prime * result + (selected ? 1231 : 1237);
         result = prime * result + ((value == null) ? 0 : value.hashCode());
+        result = prime * result + (sdv ? 1231 : 1237);
         return result;
     }
 
@@ -54,8 +55,11 @@ public class ItemDataBean extends AuditableEntityBean {
         if (value == null) {
             if (other.value != null)
                 return false;
-        } else if (!value.equals(other.value))
+        } else if (!value.equals(other.value)) {
             return false;
+        } else if (sdv != other.sdv) {
+            return false;
+        }
         return true;
     }
 
@@ -68,6 +72,8 @@ public class ItemDataBean extends AuditableEntityBean {
     private boolean selected;// for construct data only
 
     private boolean auditLog = false;
+
+    private boolean sdv;
 
     public ItemDataBean() {
         eventCRFId = 0;
@@ -159,5 +165,37 @@ public class ItemDataBean extends AuditableEntityBean {
 
     public void setAuditLog(boolean auditLog) {
         this.auditLog = auditLog;
+    }
+
+    public boolean isSdv() {
+        return sdv;
+    }
+
+    public void setSdv(boolean sdv) {
+        this.sdv = sdv;
+    }
+    
+    public ItemDataBean copy() {
+        ItemDataBean idb = new ItemDataBean();
+        idb.setAuditLog(isAuditLog());
+        idb.setEventCRFId(getEventCRFId());
+        idb.setItemId(getItemId());
+        idb.setOrdinal(getOrdinal());
+        idb.setSelected(isSelected());
+        idb.setValue(getValue());
+        idb.setActive(isActive());
+        idb.setCreatedDate(getCreatedDate());
+        idb.setId(getId());
+        idb.setName(getName());
+        idb.setOldStatus(getOldStatus());
+        if (owner != null) {
+            idb.setOwner(owner);
+        }
+        idb.setStatus(getStatus());
+        idb.setUpdatedDate(getUpdatedDate());
+        if (updater != null) {
+            idb.setUpdater(updater);
+        }
+        return idb;
     }
 }

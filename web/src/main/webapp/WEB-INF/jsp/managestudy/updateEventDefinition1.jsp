@@ -4,6 +4,7 @@
 <fmt:setBundle basename="org.akaza.openclinica.i18n.words" var="resword"/>
 <fmt:setBundle basename="org.akaza.openclinica.i18n.format" var="resformat"/>
 <fmt:setBundle basename="org.akaza.openclinica.i18n.notes" var="resnote"/>
+<fmt:setBundle basename="org.akaza.openclinica.i18n.terms" var="resterm"/>
 <%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
 
 <jsp:include page="../include/managestudy-header.jsp"/>
@@ -43,7 +44,6 @@
 <jsp:useBean scope='session' id='userBean' class='org.akaza.openclinica.bean.login.UserAccountBean'/>
 <jsp:useBean scope='session' id='definition' class='org.akaza.openclinica.bean.managestudy.StudyEventDefinitionBean'/>
 <jsp:useBean scope='session' id='eventDefinitionCRFs' class='java.util.ArrayList'/>
-<jsp:useBean scope='request' id='sdvOptions' class='java.util.ArrayList'/>
 <script type="text/JavaScript" language="JavaScript">
     <!--
     function myCancel() {
@@ -290,21 +290,12 @@
  </c:choose>
     
     <td class="table_cell" colspan="2"><fmt:message key="sdv_option" bundle="${resword}"/>:
-		    <select name="sdvOption<c:out value="${count}"/>">
-	        	<c:set var="index" value="1"/>
-	            <c:forEach var="sdv" items="${sdvOptions}">
-	            	<c:choose>
-	            	<c:when test="${edc.sourceDataVerification.code == index}">
-	            		<option value="${index}" selected><c:out value="${sdv}"/>
-	                </c:when>
-	                <c:otherwise>
-	            		<option value="${index}"><c:out value="${sdv}"/>
-	                </c:otherwise>
-	                </c:choose>
-	            	<c:set var="index" value="${index+1}"/>
-	            </c:forEach>
-        	</select>
-		    </td>
+            <select name="sdvOption<c:out value="${count}"/>">
+                <c:forEach var="sdv" items="${edc.sdvOptions}">
+                    <option value="${sdv.code}" ${edc.sourceDataVerification.code == sdv.code ? "selected" : ""}><fmt:message key="${sdv.description}" bundle="${resterm}"/></option>
+                </c:forEach>
+            </select>
+            </td>
 </tr>
 
 <tr valign="top">
@@ -559,12 +550,12 @@
                                             <div class="box_T"><div class="box_L"><div class="box_R"><div class="box_B"><div class="box_TL"><div class="box_TR"><div class="box_BL"><div class="box_BR">
 
                                                 <div class="textbox_center" align="center">
-	
-							<span class="title_manage">			
-						
-							<b><fmt:message key="enter_definition_name_and_description" bundle="${resword}"/><br><br></b>
-									
-							</span>
+    
+                            <span class="title_manage">         
+                        
+                            <b><fmt:message key="enter_definition_name_and_description" bundle="${resword}"/><br><br></b>
+                                    
+                            </span>
 
                                                 </div>
                                             </div></div></div></div></div></div></div></div>
@@ -578,9 +569,9 @@
 
                                                 <div class="textbox_center" align="center">
 
-							<span class="title_manage">
-				             <fmt:message key="add_CRFs_to_definition" bundle="${resword}"/><br><br>
-							</span>
+                            <span class="title_manage">
+                             <fmt:message key="add_CRFs_to_definition" bundle="${resword}"/><br><br>
+                            </span>
 
                                                 </div>
                                             </div></div></div></div></div></div></div></div>
@@ -594,9 +585,9 @@
 
                                                 <div class="textbox_center" align="center">
 
-							<span class="title_manage">
-				             <fmt:message key="edit_properties_for_each_CRF" bundle="${resword}"/><br><br>
-							</span>
+                            <span class="title_manage">
+                             <fmt:message key="edit_properties_for_each_CRF" bundle="${resword}"/><br><br>
+                            </span>
 
                                                 </div>
                                             </div></div></div></div></div></div></div></div>
@@ -610,9 +601,9 @@
 
                                                 <div class="textbox_center" align="center">
 
-							<span class="title_manage">
-				             <fmt:message key="confirm_and_submit_definition" bundle="${resword}"/><br><br>
-							</span>
+                            <span class="title_manage">
+                             <fmt:message key="confirm_and_submit_definition" bundle="${resword}"/><br><br>
+                            </span>
 
                                                 </div>
                                             </div></div></div></div></div></div></div></div>

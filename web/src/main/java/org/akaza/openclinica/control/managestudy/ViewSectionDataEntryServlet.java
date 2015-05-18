@@ -12,9 +12,11 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -42,6 +44,7 @@ import org.akaza.openclinica.bean.submit.EventCRFBean;
 import org.akaza.openclinica.bean.submit.ItemGroupBean;
 import org.akaza.openclinica.bean.submit.SectionBean;
 import org.akaza.openclinica.bean.submit.SubjectBean;
+import org.akaza.openclinica.bean.submit.ItemBean;
 import org.akaza.openclinica.control.form.DiscrepancyValidator;
 import org.akaza.openclinica.control.form.FormDiscrepancyNotes;
 import org.akaza.openclinica.control.form.FormProcessor;
@@ -60,6 +63,11 @@ import org.akaza.openclinica.service.DiscrepancyNoteThread;
 import org.akaza.openclinica.service.DiscrepancyNoteUtil;
 import org.akaza.openclinica.view.Page;
 import org.akaza.openclinica.web.InsufficientPermissionException;
+import org.akaza.openclinica.util.CrfShortcutsAnalyzer;
+import org.akaza.openclinica.util.ItemSDVServiceImpl;
+import org.akaza.openclinica.dao.admin.CRFDAO;
+import org.akaza.openclinica.bean.admin.CRFBean;
+import org.akaza.openclinica.bean.core.DataEntryStage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +83,12 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
     Locale locale;
     public static String EVENT_CRF_ID = "ecId";
     public static String ENCLOSING_PAGE = "enclosingPage";
+    public static String DOMAIN_NAME = "domain_name";
+    public static String ACTION_START_INITIAL_DATA_ENTRY = "ide_s";
+    public static String ACTION_CONTINUE_INITIAL_DATA_ENTRY = "ide_c";
+    public static String ACTION_START_DOUBLE_DATA_ENTRY = "dde_s";
+    public static String ACTION_CONTINUE_DOUBLE_DATA_ENTRY = "dde_c";
+    public static String ACTION_ADMINISTRATIVE_EDITING = "ae";
 
     /**
      * Checks whether the user has the correct privilege
@@ -174,9 +188,27 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
         int eventDefinitionCRFId = fp.getInt("eventDefinitionCRFId");
         EventDefinitionCRFDAO eventCrfDao = new EventDefinitionCRFDAO(getDataSource());
         edcb = (EventDefinitionCRFBean) eventCrfDao.findByPK(eventDefinitionCRFId);
-        if (eventCRFId == 0 && edcb.getStudyId() != currentStudy.getParentStudyId() && edcb.getStudyId() != currentStudy.getId()) {
-            addPageMessage(respage.getString("no_have_correct_privilege_current_study") + " " + respage.getString("change_study_contact_sysadmin"), request);
-            throw new InsufficientPermissionException(Page.MENU_SERVLET, resexception.getString("not_director"), "1");
+
+        // if (eventCRFId == 0 && edcb.getStudyId() != currentStudy.getParentStudyId() && edcb.getStudyId() != currentStudy.getId()) {
+        //     addPageMessage(respage.getString("no_have_correct_privilege_current_study") + " " + respage.getString("change_study_contact_sysadmin"), request);
+        //     throw new InsufficientPermissionException(Page.MENU_SERVLET, resexception.getString("not_director"), "1");
+        // }
+
+        if (edcb.getId() > 0) {
+            Set<Integer> studyIds = new HashSet<Integer>();
+            if (currentStudy.getParentStudyId() > 0) {
+                studyIds.add(currentStudy.getId());
+                studyIds.add(currentStudy.getParentStudyId());
+            } else {
+                studyIds.addAll(new StudyDAO(getDataSource()).findAllSiteIdsByStudy(currentStudy));
+            }
+            if (eventCRFId == 0 && !studyIds.contains(edcb.getStudyId())) {
+                addPageMessage(
+                        respage.getString("no_have_correct_privilege_current_study") + " "
+                                + respage.getString("change_study_contact_sysadmin"), request);
+                throw new InsufficientPermissionException(Page.MENU_SERVLET, resexception.getString("not_director"),
+                        "1");
+            }
         }
 
         if (crfId == 0 && eventDefinitionCRFId > 0) {
@@ -194,7 +226,6 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
         // interviewdate
         // for a particular event
         session.removeAttribute("presetValues");
-
         EventCRFDAO ecdao = new EventCRFDAO(getDataSource());
         SectionDAO sdao = new SectionDAO(getDataSource());
         String age = "";
@@ -210,34 +241,33 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
             StudySubjectBean sub = (StudySubjectBean) ssdao.findByPK(studySubjectId);
             request.setAttribute("studySubject", sub);
         }
-
+        List<DiscrepancyNoteThread> noteThreads = new ArrayList<DiscrepancyNoteThread>();
         if (eventCRFId > 0) {
             // for event crf, the input crfVersionId from url =0
             ecb = (EventCRFBean) ecdao.findByPK(eventCRFId);
 
             StudyEventDAO sedao = new StudyEventDAO(getDataSource());
-            StudyEventBean event = (StudyEventBean) sedao.findByPK(ecb.getStudyEventId());
-            // System.out.println("event.getSubjectEventStatus()" +
-            // event.getSubjectEventStatus().getName());
-            if (event.getSubjectEventStatus().equals(SubjectEventStatus.LOCKED)) {
-                request.setAttribute("isLocked", "yes");
-                // System.out.println("this event crf is locked");
-            } else {
-                request.setAttribute("isLocked", "no");
-            }
-
-            if (studySubjectId <= 0) {
-
-                studySubjectId = event.getStudySubjectId();
-                request.setAttribute("studySubjectId", studySubjectId + "");
-
+            if (ecb != null && ecb.getId() > 0) {
+                request.setAttribute("eventCRF", ecb);
+                StudyEventBean event = (StudyEventBean) sedao.findByPK(ecb.getStudyEventId());
+                // System.out.println("event.getSubjectEventStatus()" +
+                // event.getSubjectEventStatus().getName());
+                if (event.getSubjectEventStatus().equals(SubjectEventStatus.LOCKED)) {
+                    request.setAttribute("isLocked", "yes");
+                    // System.out.println("this event crf is locked");
+                } else {
+                    request.setAttribute("isLocked", "no");
+                }
+                if (studySubjectId <= 0) {
+                    studySubjectId = event.getStudySubjectId();
+                    request.setAttribute("studySubjectId", studySubjectId + "");
+                }
             }
             // Get the status/number of item discrepancy notes
             DiscrepancyNoteDAO dndao = new DiscrepancyNoteDAO(getDataSource());
             ArrayList<DiscrepancyNoteBean> allNotes = new ArrayList<DiscrepancyNoteBean>();
             List<DiscrepancyNoteBean> eventCrfNotes = new ArrayList<DiscrepancyNoteBean>();
-            List<DiscrepancyNoteThread> noteThreads = new ArrayList<DiscrepancyNoteThread>();
-
+            
             // if (eventCRFId > 0) {
             // this method finds only parent notes
             allNotes = dndao.findAllTopNotesByEventCRF(eventCRFId);
@@ -245,64 +275,27 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
             eventCrfNotes = dndao.findOnlyParentEventCRFDNotesFromEventCRF(ecb);
             if (!eventCrfNotes.isEmpty()) {
                 allNotes.addAll(eventCrfNotes);
-                // make sure a necessary request attribute "hasNameNote" is set
-                // properly
+                // make sure a necessary request attribute "hasNameNote" is set properly
                 this.setAttributeForInterviewerDNotes(eventCrfNotes, request);
             }
             // }
             // Create disc note threads out of the various notes
             DiscrepancyNoteUtil dNoteUtil = new DiscrepancyNoteUtil();
             noteThreads = dNoteUtil.createThreadsOfParents(allNotes, getDataSource(), currentStudy, null, -1, true);
-            // variables that provide values for the CRF discrepancy note header
-            int updatedNum = 0;
-            int openNum = 0;
-            int closedNum = 0;
-            int resolvedNum = 0;
-            int notAppNum = 0;
-            DiscrepancyNoteBean tempBean;
-            for (DiscrepancyNoteThread dnThread : noteThreads) {
-                /*
-                 * 3014: do not count parent beans, only the last child disc
-                 * note of the thread.
-                 */
-                tempBean = dnThread.getLinkedNoteList().getLast();
-                if (tempBean != null) {
-                    if (ResolutionStatus.UPDATED.equals(tempBean.getResStatus())) {
-                        updatedNum++;
-                    } else if (ResolutionStatus.OPEN.equals(tempBean.getResStatus())) {
-                        openNum++;
-                    } else if (ResolutionStatus.CLOSED.equals(tempBean.getResStatus())) {
-                        // if (dn.getParentDnId() > 0){
-                        closedNum++;
-                        // }
-                    } else if (ResolutionStatus.RESOLVED.equals(tempBean.getResStatus())) {
-                        // if (dn.getParentDnId() > 0){
-                        resolvedNum++;
-                        // }
-                    } else if (ResolutionStatus.NOT_APPLICABLE.equals(tempBean.getResStatus())) {
-                        notAppNum++;
-                    }
-                }
+            //====1
+            List<SectionBean> allSections = ecb != null
+                    ? sdao.findAllByCRFVersionId(ecb.getCRFVersionId())
+                    : new ArrayList<SectionBean>();
+            ItemFormMetadataDAO ifmdao = new ItemFormMetadataDAO(getDataSource());
+            getCrfShortcutsAnalyzer(request, new ItemSDVServiceImpl(getDataSource()), true).prepareCrfShortcutLinks(ecb, ifmdao,
+                    eventDefinitionCRFId, allSections, noteThreads);
+            DisplayTableOfContentsBean displayBean = getDisplayBean(ecb);
 
-            }
-            request.setAttribute("updatedNum", updatedNum + "");
-            request.setAttribute("openNum", openNum + "");
-            request.setAttribute("closedNum", closedNum + "");
-            request.setAttribute("resolvedNum", resolvedNum + "");
-            request.setAttribute("notAppNum", notAppNum + "");
-
-            DisplayTableOfContentsBean displayBean = TableOfContentsServlet.getDisplayBean(ecb, getDataSource(), currentStudy);
-            // Make sure that the interviewDate in the eventCRF is properly
-            // formatted
-            // for viewSectionDataEntry.jsp --> interviewer.jsp
-            // int studyEventId = (Integer)request.getAttribute("studyEvent");
-            // SimpleDateFormat formatter = new SimpleDateFormat("MM/dd/yyyy");
-            //
             Date tmpDate = displayBean.getEventCRF().getDateInterviewed();
             String formattedInterviewerDate;
+            SimpleDateFormat localDF = new SimpleDateFormat(resformat.getString("date_format_string"), locale);
             try {
-                DateFormat local_df = new SimpleDateFormat(resformat.getString("date_format_string"), ResourceBundleProvider.getLocale());
-                formattedInterviewerDate = local_df.format(tmpDate);
+                formattedInterviewerDate = localDF.format(tmpDate);
             } catch (Exception e) {
                 formattedInterviewerDate = "";
             }
@@ -324,13 +317,12 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
                 }
             } else {
                 addPageMessage(respage.getString("there_are_no_sections_ins_this_CRF"), request);
-                // forwardPage(Page.SUBMIT_DATA_SERVLET);
                 forwardPage(Page.LIST_STUDY_SUBJECTS_SERVLET, request, response);
-                // >> changed tbh, 06/2009
                 return;
             }
+            //====1
         } else if (crfVersionId > 0) {// for viewing blank CRF
-            DisplayTableOfContentsBean displayBean = ViewTableOfContentServlet.getDisplayBean(getDataSource(), crfVersionId);
+            DisplayTableOfContentsBean displayBean = getDisplayBeanByCrfVersionId(crfVersionId);
             request.setAttribute("toc", displayBean);
             ArrayList sections = displayBean.getSections();
 
@@ -411,8 +403,10 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
             request.setAttribute("studySubject", sub);
             request.setAttribute("subject", subject);
             request.setAttribute("age", age);
-
         }
+        DiscrepancyNoteDAO discrepancyNoteDao = new DiscrepancyNoteDAO(getDataSource());
+        request.setAttribute("eventCrfDoesNotHaveOutstandingDNs",
+                ecb.getId() <= 0 || discrepancyNoteDao.doesNotHaveOutstandingDNs(ecb));
         // FormBeanUtil formUtil = new FormBeanUtil();
         // DisplaySectionBean newDisplayBean = new DisplaySectionBean();
 
@@ -437,16 +431,8 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
         request.setAttribute(SECTION_BEAN, sb);
         dsb = super.getDisplayBean(hasItemGroup, false, request, isSubmitted);
 
-        StudySubjectDAO studySubjectDAO = new StudySubjectDAO(getDataSource());
-        StudyEventDefinitionDAO studyEventDefinitionDAO = new StudyEventDefinitionDAO(getDataSource());
-        StudyEventDAO studyEventDAO = new StudyEventDAO(getDataSource());
-        StudyEventDefinitionBean studyEventDefinition =
-                (StudyEventDefinitionBean) studyEventDefinitionDAO.findByPK(edcb.getStudyEventDefinitionId());
-        StudyEventBean studyEvent = (StudyEventBean) studyEventDAO.findByPK(ecb.getStudyEventId());
-        VariableSubstitutionHelper.replaceVariables(dsb, currentStudy,
-                (StudySubjectBean) studySubjectDAO.findByPK(studySubjectId), studyEventDefinition, studyEvent,
-                getDataSource());
-
+        // ====2
+        // ====2
         FormDiscrepancyNotes discNotes = (FormDiscrepancyNotes) session.getAttribute(AddNewSubjectServlet.FORM_DISCREPANCY_NOTES_NAME);
         if (discNotes == null) {
             discNotes = new FormDiscrepancyNotes();
@@ -463,24 +449,22 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
         // DisplayFormGroups List to the ones we have just generated
         // @pgawade 30-May-2012 Fix for issue 13963 - added an extra parameter
         // 'isSubmitted' to method createItemWithGroups
-        List<DisplayItemWithGroupBean> displayItemWithGroups = super.createItemWithGroups(dsb, hasItemGroup, eventDefinitionCRFId, request, isSubmitted);
+        List<DisplayItemWithGroupBean> displayItemWithGroups = super.createItemWithGroupsNew(dsb, hasItemGroup, eventDefinitionCRFId, request, isSubmitted);
         dsb.setDisplayItemGroups(displayItemWithGroups);
 
-        super.populateNotesWithDBNoteCounts(discNotes, dsb, request);
+        //====3
+        CrfShortcutsAnalyzer crfShortcutsAnalyzer = getCrfShortcutsAnalyzer(request, new ItemSDVServiceImpl(getDataSource()), false);
+        super.populateNotesWithDBNoteCountsNew(discNotes, noteThreads, dsb, request, crfShortcutsAnalyzer);
+        //====3
 
-        if (fp.getString("fromViewNotes") != null && "1".equals(fp.getString("fromViewNotes"))) {
-            request.setAttribute("fromViewNotes", fp.getString("fromViewNotes"));
-        } else {
-            session.removeAttribute("viewNotesURL");
-        }
-
+        //====4
+        //====4
         if ("saveNotes".equalsIgnoreCase(action)) {
             LOGGER.info("33333how many group rows:" + dsb.getDisplayItemGroups().size());
 
             // let's save notes for the blank items
             DiscrepancyNoteDAO dndao = new DiscrepancyNoteDAO(getDataSource());
             discNotes = (FormDiscrepancyNotes) session.getAttribute(AddNewSubjectServlet.FORM_DISCREPANCY_NOTES_NAME);
-
             for (int i = 0; i < dsb.getDisplayItemGroups().size(); i++) {
                 DisplayItemWithGroupBean diwb = dsb.getDisplayItemGroups().get(i);
 
@@ -495,7 +479,7 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
                             String inputName = getGroupItemInputName(displayGroup, j, displayItem);
                             LOGGER.info("inputName:" + inputName);
                             LOGGER.info("item data id:" + displayItem.getData().getId());
-                            AddNewSubjectServlet.saveFieldNotes(inputName, discNotes, dndao, displayItem.getData().getId(), "itemData", currentStudy);
+                            AddNewSubjectServlet.saveFieldNotes(inputName, discNotes, dndao, displayItem.getData().getId(), "itemData", currentStudy, -1, true);
 
                         }
                     }
@@ -503,20 +487,18 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
                 } else {
                     DisplayItemBean dib = diwb.getSingleItem();
                     // TODO work on this line
-
                     String inputName = getInputName(dib);
-                    AddNewSubjectServlet.saveFieldNotes(inputName, discNotes, dndao, dib.getData().getId(), DiscrepancyNoteBean.ITEM_DATA, currentStudy);
+                    AddNewSubjectServlet.saveFieldNotes(inputName, discNotes, dndao, dib.getData().getId(), DiscrepancyNoteBean.ITEM_DATA, currentStudy, -1, true);
 
                     ArrayList childItems = dib.getChildren();
                     for (int j = 0; j < childItems.size(); j++) {
                         DisplayItemBean child = (DisplayItemBean) childItems.get(j);
                         inputName = getInputName(child);
-                        AddNewSubjectServlet.saveFieldNotes(inputName, discNotes, dndao, dib.getData().getId(), DiscrepancyNoteBean.ITEM_DATA, currentStudy);
+                        AddNewSubjectServlet.saveFieldNotes(inputName, discNotes, dndao, dib.getData().getId(), DiscrepancyNoteBean.ITEM_DATA, currentStudy, -1, true);
 
                     }
                 }
             }
-
             addPageMessage("Discrepancy notes are saved successfully.", request);
             request.setAttribute("id", studySubjectId + "");
             forwardPage(Page.VIEW_STUDY_SUBJECT_SERVLET, request, response);
@@ -528,7 +510,6 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
             request.setAttribute(BEAN_ANNOTATIONS, ecb.getAnnotations());
             request.setAttribute("sec", sb);
             request.setAttribute("EventCRFBean", ecb);
-
             int tabNum = 1;
             if ("".equalsIgnoreCase(fp.getString("tabId"))) {
                 tabNum = 1;
@@ -537,12 +518,25 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
             }
             request.setAttribute("tabId", new Integer(tabNum).toString());
 
+            //====6
+            if (fp.getBoolean("annotated")) {
+                StudyEventDefinitionDAO seddao = new StudyEventDefinitionDAO(getDataSource());
+                CRFVersionDAO crfVerDao = new CRFVersionDAO(getDataSource());
+                CRFVersionBean crfVerBean = (CRFVersionBean) crfVerDao.findByPK(crfVersionId);
+                HashMap<String, String> sasItemNamesMap = getSasItemNamesMap(request);
+                request.setAttribute("sasItemNamesMap", sasItemNamesMap);
+                request.setAttribute("crfVerFormOID", crfVerBean.getOid());
+                request.setAttribute("studyEventDefs",
+                        seddao.findAllActiveByStudyIdAndCRFId(currentStudy.getId(), crfId));
+                forwardPage(Page.VIEW_ANNOTATED_SECTION_DATA_ENTRY, request, response);
+                return;
+            }
+            //====6
             // 2808: Signal interviewer.jsp that the containing page is
             // viewSectionData,
             // for the purpose of suppressing discrepancy note icons for the
             // interview date and name fields
             request.setAttribute(ENCLOSING_PAGE, "viewSectionData");
-
             if ("yes".equalsIgnoreCase(printVersion)) {
                 forwardPage(Page.VIEW_SECTION_DATA_ENTRY_PRINT, request, response);
             } else {
@@ -727,5 +721,185 @@ public class ViewSectionDataEntryServlet extends DataEntryServlet {
     @Override
     protected boolean isAdminForcedReasonForChange(HttpServletRequest request) {
         return false;
+    }
+
+    private CrfShortcutsAnalyzer getCrfShortcutsAnalyzer(HttpServletRequest request,
+            ItemSDVServiceImpl itemSDVService, boolean recreate) {
+        CrfShortcutsAnalyzer crfShortcutsAnalyzer = (CrfShortcutsAnalyzer) request
+                .getAttribute(CrfShortcutsAnalyzer.CRF_SHORTCUTS_ANALYZER);
+        if (crfShortcutsAnalyzer == null || recreate) {
+            FormProcessor fp = new FormProcessor(request);
+            Map<String, Object> attributes = new HashMap<String, Object>();
+            attributes.put(CrfShortcutsAnalyzer.EXIT_TO, fp.getString(CrfShortcutsAnalyzer.EXIT_TO, true));
+            attributes.put(CrfShortcutsAnalyzer.CW, fp.getRequest().getParameter(CrfShortcutsAnalyzer.CW));
+            attributes.put(CrfShortcutsAnalyzer.SECTION_ID, fp.getInt(CrfShortcutsAnalyzer.SECTION_ID, true));
+            attributes.put(CrfShortcutsAnalyzer.SECTION, fp.getRequest().getAttribute(CrfShortcutsAnalyzer.SECTION));
+            attributes.put(CrfShortcutsAnalyzer.USER_ROLE,
+                    request.getSession().getAttribute(CrfShortcutsAnalyzer.USER_ROLE));
+            attributes.put(CrfShortcutsAnalyzer.SERVLET_PATH, fp.getString(CrfShortcutsAnalyzer.SERVLET_PATH).isEmpty()
+                    ? fp.getRequest().getServletPath()
+                    : fp.getString(CrfShortcutsAnalyzer.SERVLET_PATH));
+
+            crfShortcutsAnalyzer = new CrfShortcutsAnalyzer(request.getScheme(), request.getMethod(),
+                    request.getRequestURI(), request.getServletPath(), (String) request.getSession().getAttribute(
+                            DOMAIN_NAME), attributes, itemSDVService);
+
+            crfShortcutsAnalyzer.getInterviewerDisplayItemBean().setField(CrfShortcutsAnalyzer.INTERVIEWER_NAME);
+            crfShortcutsAnalyzer.getInterviewDateDisplayItemBean().setField(CrfShortcutsAnalyzer.DATE_INTERVIEWED);
+
+            request.setAttribute(CrfShortcutsAnalyzer.CRF_SHORTCUTS_ANALYZER, crfShortcutsAnalyzer);
+        }
+        return crfShortcutsAnalyzer;
+    }
+
+    private DisplayTableOfContentsBean getDisplayBean(EventCRFBean ecb) {
+        DisplayTableOfContentsBean answer = new DisplayTableOfContentsBean();
+
+        answer.setEventCRF(ecb);
+
+        // get data
+        StudySubjectBean ssb = (StudySubjectBean) new StudySubjectDAO(getDataSource()).findByPK(ecb.getStudySubjectId());
+        answer.setStudySubject(ssb);
+
+        StudyEventBean seb = (StudyEventBean) new StudyEventDAO(getDataSource()).findByPK(ecb.getStudyEventId());
+        answer.setStudyEvent(seb);
+
+        ArrayList sections = getSections(ecb, new SectionDAO(getDataSource()), new ItemGroupDAO(getDataSource()));
+        answer.setSections(sections);
+
+        // get metadata
+        StudyEventDefinitionBean sedb = (StudyEventDefinitionBean) new StudyEventDefinitionDAO(getDataSource()).findByPK(
+                seb.getStudyEventDefinitionId());
+        answer.setStudyEventDefinition(sedb);
+
+        CRFVersionBean cvb = (CRFVersionBean) new CRFVersionDAO(getDataSource()).findByPK(ecb.getCRFVersionId());
+        answer.setCrfVersion(cvb);
+
+        CRFBean cb = (CRFBean) new CRFDAO(getDataSource()).findByPK(cvb.getCrfId());
+        answer.setCrf(cb);
+
+        StudyBean studyForStudySubject = new StudyDAO(getDataSource()).findByStudySubjectId(ssb.getId());
+        EventDefinitionCRFBean edcb = new EventDefinitionCRFDAO(getDataSource()).findByStudyEventDefinitionIdAndCRFId(
+                studyForStudySubject, sedb.getId(), cb.getId());
+        answer.setEventDefinitionCRF(edcb);
+
+        answer.setAction(getActionForStage(ecb.getStage()));
+
+        return answer;
+    }
+
+    private ArrayList getSections(EventCRFBean ecb, SectionDAO sdao, ItemGroupDAO igdao) {
+        HashMap numItemsBySectionId = sdao.getNumItemsBySectionId();
+        HashMap numItemsPlusRepeatBySectionId = sdao.getNumItemsPlusRepeatBySectionId(ecb);
+        HashMap numItemsCompletedBySectionId = sdao.getNumItemsCompletedBySectionId(ecb);
+        HashMap numItemsPendingBySectionId = sdao.getNumItemsPendingBySectionId(ecb);
+
+        ArrayList sections = sdao.findAllByCRFVersionId(ecb.getCRFVersionId());
+
+        for (int i = 0; i < sections.size(); i++) {
+            SectionBean sb = (SectionBean) sections.get(i);
+
+            int sectionId = sb.getId();
+            Integer key = sectionId;
+            int numItems = getIntById(numItemsBySectionId, key);
+            List<ItemGroupBean> itemGroups = igdao.findLegitGroupBySectionId(sectionId);
+            if (!itemGroups.isEmpty()) {
+                // this section has repeating rows-jxu
+                int numItemsPlusRepeat = getIntById(numItemsPlusRepeatBySectionId, key);
+                if (numItemsPlusRepeat > numItems) {
+                    sb.setNumItems(numItemsPlusRepeat);
+                } else {
+                    sb.setNumItems(numItems);
+                }
+            } else {
+                sb.setNumItems(numItems);
+            }
+
+            // According to logic that I searched from code of this package by
+            // this time,
+            // for double data entry and stage.initial_data_entry,
+            // pending should be the status in query.
+            int numItemsCompleted = getIntById(numItemsCompletedBySectionId, key);
+
+            sb.setNumItemsCompleted(numItemsCompleted);
+            sb.setNumItemsNeedingValidation(getIntById(numItemsPendingBySectionId, key));
+            sections.set(i, sb);
+        }
+
+        return sections;
+    }
+
+    private String getActionForStage(DataEntryStage stage) {
+        if (stage.equals(DataEntryStage.INITIAL_DATA_ENTRY)) {
+            return ACTION_CONTINUE_INITIAL_DATA_ENTRY;
+        } else if (stage.equals(DataEntryStage.INITIAL_DATA_ENTRY_COMPLETE)) {
+            return ACTION_START_DOUBLE_DATA_ENTRY;
+        } else if (stage.equals(DataEntryStage.DOUBLE_DATA_ENTRY)) {
+            return ACTION_CONTINUE_DOUBLE_DATA_ENTRY;
+        } else if (stage.equals(DataEntryStage.DOUBLE_DATA_ENTRY_COMPLETE)) {
+            return ACTION_ADMINISTRATIVE_EDITING;
+        }
+        return "";
+    }
+
+    private int getIntById(HashMap h, Integer key) {
+        Integer value = (Integer) h.get(key);
+        if (value == null) {
+            return 0;
+        } else {
+            return value;
+        }
+    }
+
+    private DisplayTableOfContentsBean getDisplayBeanByCrfVersionId(int crfVersionId) {
+        DisplayTableOfContentsBean answer = new DisplayTableOfContentsBean();
+
+        ArrayList sections = getSectionsByCrfVersionId(crfVersionId);
+        answer.setSections(sections);
+
+        CRFVersionDAO cvdao = new CRFVersionDAO(getDataSource());
+        CRFVersionBean cvb = (CRFVersionBean) cvdao.findByPK(crfVersionId);
+        answer.setCrfVersion(cvb);
+
+        CRFDAO cdao = new CRFDAO(getDataSource());
+        CRFBean cb = (CRFBean) cdao.findByPK(cvb.getCrfId());
+        answer.setCrf(cb);
+
+        answer.setEventCRF(new EventCRFBean());
+
+        answer.setStudyEventDefinition(new StudyEventDefinitionBean());
+
+        return answer;
+    }
+
+    public ArrayList getSectionsByCrfVersionId(int crfVersionId) {
+        SectionDAO sdao = new SectionDAO(getDataSource());
+
+        HashMap numItemsBySectionId = sdao.getNumItemsBySectionId();
+        ArrayList sections = sdao.findAllByCRFVersionId(crfVersionId);
+
+        for (int i = 0; i < sections.size(); i++) {
+            SectionBean sb = (SectionBean) sections.get(i);
+
+            Integer key = sb.getId();
+            sb.setNumItems(getIntById(numItemsBySectionId, key));
+            sections.set(i, sb);
+        }
+
+        return sections;
+    }
+
+    private HashMap<String, String> getSasItemNamesMap(HttpServletRequest request) {
+
+        HashMap<String, String> sasItemNamesMap = new HashMap<String, String>();
+        ItemDAO itemDAO = new ItemDAO(getDataSource());
+        SectionBean section = (SectionBean) request.getAttribute("sec");
+        ArrayList<ItemBean> items = itemDAO.findAllBySectionId(section.getId());
+
+        for (ItemBean item : items) {
+            String sasItemName = item.getSasName();
+            sasItemNamesMap.put(item.getName(), sasItemName);
+        }
+        return sasItemNamesMap;
     }
 }

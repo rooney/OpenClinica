@@ -24,6 +24,7 @@ import org.slf4j.MDC;
 public class OCServletFilter implements javax.servlet.Filter {
 
     public static final String USER_BEAN_NAME = "userBean";
+    public static final String REVISION_NUMBER = "revisionNumber";
 
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
