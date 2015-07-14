@@ -15,10 +15,13 @@ import java.util.Locale;
 
 import javax.sql.DataSource;
 
+import org.akaza.openclinica.bean.core.DataEntryStage;
 import org.akaza.openclinica.bean.core.DiscrepancyNoteType;
+import org.akaza.openclinica.bean.core.ItemDataType;
 import org.akaza.openclinica.bean.core.ResolutionStatus;
 import org.akaza.openclinica.bean.core.Role;
 import org.akaza.openclinica.bean.core.Status;
+import org.akaza.openclinica.bean.core.Utils;
 import org.akaza.openclinica.bean.login.UserAccountBean;
 import org.akaza.openclinica.bean.managestudy.DiscrepancyNoteBean;
 import org.akaza.openclinica.bean.managestudy.StudyBean;
@@ -123,6 +126,7 @@ public class VerifyImportedCRFDataServlet extends SecureController {
     @SuppressWarnings(value = "unchecked")
     public void processRequest() throws Exception {
         ItemDataDAO itemDataDao = new ItemDataDAO(sm.getDataSource());
+        itemDataDao.setFormatDates(false);
         EventCRFDAO eventCrfDao = new EventCRFDAO(sm.getDataSource());
         CrfBusinessLogicHelper crfBusinessLogicHelper = new CrfBusinessLogicHelper(sm.getDataSource());
         String action = request.getParameter("action");
@@ -162,7 +166,7 @@ public class VerifyImportedCRFDataServlet extends SecureController {
             HashMap<Integer, String> importedCRFStatuses = (HashMap<Integer, String>) session.getAttribute("importedCRFStatuses");
 
             for (DisplayItemBeanWrapper wrapper : displayItemBeanWrappers) {
-
+                boolean resetSDV = false;
                 int eventCrfBeanId = -1;
                 EventCRFBean eventCrfBean = new EventCRFBean();
 
@@ -213,6 +217,10 @@ public class VerifyImportedCRFDataServlet extends SecureController {
                             // itemDataDao.findByEventCRFIdAndItemName(
                             // eventCrfBean,
                             // displayItemBean.getItem().getName());
+
+                            if (!itemDataBean.getValue().equals(displayItemBean.getData().getValue()))
+                                resetSDV = true;
+
                             logger.info("just tried to find item data bean on item name " + displayItemBean.getItem().getName());
                             itemDataBean.setUpdatedDate(new Date());
                             itemDataBean.setUpdater(ub);
@@ -223,6 +231,8 @@ public class VerifyImportedCRFDataServlet extends SecureController {
                             // need to set pk here in order to create dn
                             displayItemBean.getData().setId(itemDataBean.getId());
                         } else {
+                            resetSDV = true;
+
                             itemDataDao.create(displayItemBean.getData());
                             logger.info("created: " + displayItemBean.getData().getItemId() + "event CRF ID = " + eventCrfBean.getId() + "CRF VERSION ID ="
                                     + eventCrfBean.getCRFVersionId());
@@ -278,7 +288,8 @@ public class VerifyImportedCRFDataServlet extends SecureController {
                         if (!eventCrfInts.contains(new Integer(eventCrfBean.getId()))) {
 
                             String eventCRFStatus = importedCRFStatuses.get(new Integer(eventCrfBean.getId()));
-                            if (eventCRFStatus != null && eventCRFStatus.equals("Data_Entry_Started") && eventCrfBean.getStatus().isAvailable()) {
+                            if (eventCRFStatus != null && eventCRFStatus.equals(DataEntryStage.INITIAL_DATA_ENTRY.getName())
+                                    && eventCrfBean.getStatus().isAvailable()) {
                                 crfBusinessLogicHelper.markCRFStarted(eventCrfBean, ub);
                             } else {
                                 crfBusinessLogicHelper.markCRFComplete(eventCrfBean, ub);
@@ -286,6 +297,10 @@ public class VerifyImportedCRFDataServlet extends SecureController {
                             eventCrfInts.add(new Integer(eventCrfBean.getId()));
                         }
                     }
+                    // Reset the SDV status if item data has been changed or added
+                    if (eventCrfBean != null && resetSDV)
+                        eventCrfDao.setSDVStatus(false, ub.getId(), eventCrfBean.getId());
+
                     // end of item datas, tbh
                     // crfBusinessLogicHelper.markCRFComplete(eventCrfBean, ub);
                     // System .out.println("*** just updated event crf bean: "+

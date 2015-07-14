@@ -211,13 +211,14 @@ public class DeleteEventCRFServlet extends SecureController {
 				eventCRF.setUpdater(ub);
 				ecdao.update(eventCRF);
 								
-				if(event.getSubjectEventStatus().isCompleted()){
+				if(event.getSubjectEventStatus().isCompleted() || event.getSubjectEventStatus().isSigned()){
 					event.setSubjectEventStatus(SubjectEventStatus.DATA_ENTRY_STARTED);
+					event.setUpdater(ub);
                    sedao = new StudyEventDAO(sm.getDataSource());
                    sedao.update(event);
 				}
 				
-				String emailBody = respage.getString("the_event_CRF") + cb.getName() + respage.getString("has_been_deleted_from_the_event") + event.getStudyEventDefinition().getName() + ".";
+				String emailBody = respage.getString("the_event_CRF") + cb.getName() + respage.getString("has_been_deleted_from_the_event") + event.getStudyEventDefinition().getName() + ". " + respage.getString("has_been_deleted_from_the_event_cont");
 
 				addPageMessage(emailBody);
 				// sendEmail(emailBody);

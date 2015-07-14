@@ -93,11 +93,12 @@ public class ImportCRFInfoContainer {
                         if (eventCrfBeans.isEmpty()) {
                             logger.debug("   found no event crfs from Study Event id " + studyEventBean.getId() + ", location " + studyEventBean.getLocation());
 
-                            ImportCRFInfo importCrfInfo = new ImportCRFInfo(subjectDataBean.getSubjectOID(), studyEventDataBean.getStudyEventOID(),
+                            ImportCRFInfo importCrfInfo = new ImportCRFInfo(studyOID, subjectDataBean.getSubjectOID(), studyEventDataBean.getStudyEventOID(),
                                     formDataBean.getFormOID());
+                            importCrfInfo.setPreImportStage(DataEntryStage.UNCOMPLETED);
                             String crfStatus = formDataBean.getEventCRFStatus();
-                            if (crfStatus != null && crfStatus.equals("Data_Entry_Started"))
-                                importCrfInfo.setPostImportStatus(crfStatus);
+                            if (crfStatus != null && crfStatus.equals(DataEntryStage.INITIAL_DATA_ENTRY.getName()))
+                                importCrfInfo.setPostImportStage(DataEntryStage.INITIAL_DATA_ENTRY);
                             if ((studyEventBean.getSubjectEventStatus().equals(SubjectEventStatus.SCHEDULED)
                                     || studyEventBean.getSubjectEventStatus().equals(SubjectEventStatus.DATA_ENTRY_STARTED) || studyEventBean
                                     .getSubjectEventStatus().equals(SubjectEventStatus.COMPLETED))) {
@@ -113,16 +114,16 @@ public class ImportCRFInfoContainer {
                         }
 
                         for (EventCRFBean ecb : eventCrfBeans) {
-                            ImportCRFInfo importCrfInfo = new ImportCRFInfo(subjectDataBean.getSubjectOID(), studyEventDataBean.getStudyEventOID(),
+                            ImportCRFInfo importCrfInfo = new ImportCRFInfo(studyOID, subjectDataBean.getSubjectOID(), studyEventDataBean.getStudyEventOID(),
                                     formDataBean.getFormOID());
+                            importCrfInfo.setPreImportStage(ecb.getStage());
                             String crfStatus = formDataBean.getEventCRFStatus();
-                            if (crfStatus != null && crfStatus.equals("Data_Entry_Started"))
-                                importCrfInfo.setPostImportStatus(crfStatus);
+                            if (crfStatus != null && crfStatus.equals(DataEntryStage.INITIAL_DATA_ENTRY.getName()))
+                                importCrfInfo.setPostImportStage(DataEntryStage.INITIAL_DATA_ENTRY);
                             importCrfInfo.setEventCRFID(new Integer(ecb.getId()));
-                            if ((!upsert.isDataEntryStarted() && ecb.getStage().equals(DataEntryStage.INITIAL_DATA_ENTRY))
-                                    || (!upsert.isDataEntryComplete() && ecb.getStage().equals(DataEntryStage.DOUBLE_DATA_ENTRY_COMPLETE))) {
+                            if (!(ecb.getStage().equals(DataEntryStage.INITIAL_DATA_ENTRY) && upsert.isDataEntryStarted())
+                                    && !(ecb.getStage().equals(DataEntryStage.DOUBLE_DATA_ENTRY_COMPLETE) && upsert.isDataEntryComplete()))
                                 importCrfInfo.setProcessImport(false);
-                            }
                             importCRFList.add(importCrfInfo);
                             if (importCrfInfo.isProcessImport())
                                 formMap.put(formDataBean.getFormOID(), "true");

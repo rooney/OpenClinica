@@ -12,6 +12,8 @@ import org.akaza.openclinica.bean.core.AuditableEntityBean;
 import org.akaza.openclinica.bean.core.DataEntryStage;
 import org.akaza.openclinica.bean.core.Status;
 import org.akaza.openclinica.bean.login.UserAccountBean;
+import org.akaza.openclinica.bean.managestudy.StudyEventBean;
+import org.akaza.openclinica.bean.managestudy.StudySubjectBean;
 
 import java.util.Date;
 
@@ -50,6 +52,9 @@ public class EventCRFBean extends AuditableEntityBean {
     private boolean notStarted = true;
     private UserAccountBean doubleDataOwner = new UserAccountBean(); // not in db
 
+    private StudySubjectBean studySubject;
+    private StudyEventBean studyEvent;
+    
     // the following properties are not in the table; they are meant for
     // convenience
     private CRFBean crf = new CRFBean();
@@ -526,4 +531,20 @@ public class EventCRFBean extends AuditableEntityBean {
     public void setDoubleDataOwner(UserAccountBean doubleDataOwner) {
         this.doubleDataOwner = doubleDataOwner;
     }
+
+	public StudySubjectBean getStudySubject() {
+		return studySubject;
+	}
+
+	public void setStudySubject(StudySubjectBean studySubject) {
+		this.studySubject = studySubject;
+	}
+
+	public StudyEventBean getStudyEvent() {
+		return studyEvent;
+	}
+
+	public void setStudyEvent(StudyEventBean studyEvent) {
+		this.studyEvent = studyEvent;
+	}
 }

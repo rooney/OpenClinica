@@ -1,16 +1,17 @@
-package org.akaza.openclinica.web.pmanage;
+package org.akaza.openclinica.service.pmanage;
 
 import java.net.MalformedURLException;
 import java.net.URL;
 
+import javax.servlet.http.HttpSession;
+
+import org.akaza.openclinica.bean.login.ParticipantDTO;
 import org.akaza.openclinica.dao.core.CoreResources;
-import org.akaza.openclinica.web.pmanage.Authorization;
-import org.akaza.openclinica.web.pmanage.Study;
+import org.akaza.openclinica.service.pmanage.Authorization;
+import org.akaza.openclinica.service.pmanage.Study;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.CommonsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
@@ -41,7 +42,20 @@ public class ParticipantPortalRegistrar {
         return null;
     }
 
-    public String getRegistrationStatus(String studyOid) {
+    public String getCachedRegistrationStatus(String studyOid, HttpSession session) throws Exception {
+        String regStatus = (String) session.getAttribute("pManageRegistrationStatus");
+        if (regStatus == null) {
+            regStatus = getRegistrationStatus(studyOid);
+            session.setAttribute("pManageRegistrationStatus", regStatus);
+        }
+        return regStatus;
+    }
+
+    public String getRegistrationStatus(String studyOid) throws Exception {
+        return loadRegistrationStatus(studyOid);
+    }
+
+    private String loadRegistrationStatus(String studyOid) {
         String ocUrl = CoreResources.getField("sysURL.base") + "rest2/openrosa/" + studyOid;
         String pManageUrl = CoreResources.getField("portalURL") + "/app/rest/oc/authorizations?studyoid=" + studyOid + "&instanceurl=" + ocUrl;
         CommonsClientHttpRequestFactory requestFactory = new CommonsClientHttpRequestFactory();
@@ -53,7 +67,7 @@ public class ParticipantPortalRegistrar {
                 return response[0].getAuthorizationStatus().getStatus();
         } catch (Exception e) {
             logger.error(e.getMessage());
-            logger.error(ExceptionUtils.getStackTrace(e));
+            logger.debug(ExceptionUtils.getStackTrace(e));
         }
         return "";
     }
@@ -105,6 +119,22 @@ public class ParticipantPortalRegistrar {
 
     public String registerStudy(String studyOid) {
         return registerStudy(studyOid, null);
+    }
+
+    public String sendEmailThruMandrillViaOcui(ParticipantDTO participantDTO) {
+        String pManageUrl = CoreResources.getField("portalURL") + "/app/rest/oc/email";
+
+        CommonsClientHttpRequestFactory requestFactory = new CommonsClientHttpRequestFactory();
+        requestFactory.setReadTimeout(PARTICIPATE_READ_TIMEOUT);
+        RestTemplate rest = new RestTemplate(requestFactory);
+
+        try {
+            ParticipantDTO response = rest.postForObject(pManageUrl, participantDTO, ParticipantDTO.class);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            logger.error(ExceptionUtils.getStackTrace(e));
+        }
+        return "";
     }
 
     public String registerStudy(String studyOid, String hostName) {
