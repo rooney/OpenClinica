@@ -1121,7 +1121,7 @@
                                                 <%-- display the HTML input tag --%> <c:set
                                                     var="displayItem" scope="request"
                                                     value="${displayItem.singleItem}" /> <c:import
-                                                    url="../submit/showItemInputMonitor.jsp">
+                                                    url="../submit/showItemInputMonitorNew.jsp">
                                                     <c:param name="key" value="${numOfDate}" />
                                                     <c:param name="tabNum" value="${itemNum}" />
                                                     <c:param name="repeatParentId" value="${displayItem.itemGroup.itemGroupBean.oid}"/>
@@ -1201,7 +1201,7 @@
                                                     <%-- display the HTML input tag --%> <c:set var="itemNum"
                                                         value="${itemNum + 1}" /> <c:set var="displayItem"
                                                         scope="request" value="${childItem}" /> <c:import
-                                                        url="../submit/showItemInputMonitor.jsp">
+                                                        url="../submit/showItemInputMonitorNew.jsp">
                                                         <c:param name="key" value="${numOfDate}" />
                                                         <c:param name="tabNum" value="${itemNum}" />
                                                         <c:param name="repeatParentId" value="${displayItem.itemGroup.itemGroupBean.oid}"/>

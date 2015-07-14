@@ -521,7 +521,7 @@ public class CrfShortcutsAnalyzer {
 		CurrentSectionInfo currentSectionInfo = new CurrentSectionInfo(sections);
 		StudyUserRoleBean studyUserRoleBean = (StudyUserRoleBean) attributes.get(USER_ROLE);
 		setUserIsAbleToSDVItems(eventCrfBean.getStage().isDoubleDE_Complete()
-				&& (studyUserRoleBean.isMonitor()));
+				&& (studyUserRoleBean.isMonitor() || studyUserRoleBean.isSubmitData()));
 		prepareItemsToSDVShortcutLink(eventCrfBean, eventDefinitionCRFId, sections);
 		for (DiscrepancyNoteThread dnThread : noteThreads) {
 			tempBean = dnThread.getLinkedNoteList().getLast();

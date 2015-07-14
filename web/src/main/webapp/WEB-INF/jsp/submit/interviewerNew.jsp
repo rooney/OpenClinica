@@ -633,9 +633,7 @@
 </table>
 
 <script>
-    $("#crfShortcutsTable").css("top", crfShortcutsTableDefTop + "px");
-    $("#crfShortcutsTable").css("left", crfShortcutsTableDefLeft + "px");
-    initCrfMoreInfo();
+    
     var crfShortcutInterval;
     var crfShortcutFunction = function() {
         try {
@@ -664,6 +662,9 @@
         }
     }
     $(document).ready(function () {
+        $("#crfShortcutsTable").css("top", crfShortcutsTableDefTop + "px");
+        $("#crfShortcutsTable").css("left", crfShortcutsTableDefLeft + "px");
+        initCrfMoreInfo();
         crfShortcutInterval = setInterval(crfShortcutFunction, 1);
     });
     window.updateCRFHeader = function(field, itemId, rowCount, resolutionStatusId) {

@@ -170,7 +170,8 @@ public class ItemDataDAO extends AuditableEntityDAO {
         variables.put(new Integer(5), new Integer(idb.getUpdaterId()));
         variables.put(new Integer(6), new Integer(idb.getOrdinal()));
         variables.put(new Integer(7), new Integer(idb.getOldStatus().getId()));
-        variables.put(new Integer(8), new Integer(idb.getId()));
+        variables.put(new Integer(8), new Boolean(idb.isSdv()));
+        variables.put(new Integer(9), new Integer(idb.getId()));
         this.execute(digester.getQuery("update"), variables);
 
         if (isQuerySuccessful()) {
