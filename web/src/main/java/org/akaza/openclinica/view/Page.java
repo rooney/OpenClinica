@@ -643,7 +643,9 @@ public enum Page {
             "View default crf versions print"),
      MANAGE_STUDY_MODULE ( "/pages/studymodule",null),
      VIEW_SECTION_DATA_ENTRY_SERVLET_REST_URL ("/ViewSectionDataEntryRESTUrlServlet", "View Section Data Entry Servlet for REST Url call"),
-     PARTICIPANT_FORM_SERVLET("/WEB-INF/jsp/submit/participantFormServlet.jsp","Participant Form Servlet");
+     PARTICIPANT_FORM_SERVLET("/WEB-INF/jsp/submit/participantFormServlet.jsp","Participant Form Servlet"),
+
+     VIEW_ANNOTATED_SECTION_DATA_ENTRY("/WEB-INF/jsp/managestudy/viewAnnotatedSectionDataEntry.jsp","View Section Data Entry");
     
       	
   //  private final static String path = "/WEB-INF/jsp/";

@@ -10,6 +10,8 @@ package org.akaza.openclinica.bean.submit;
 import org.akaza.openclinica.bean.core.EntityBean;
 import org.akaza.openclinica.core.form.StringUtil;
 
+import java.util.List;
+
 /**
  * @author ssachs
  */
@@ -23,6 +25,8 @@ public class ItemFormMetadataBean extends EntityBean implements Comparable {
     private String parentLabel;
     private int columnNumber;
     private String pageNumberLabel;
+    private boolean sdvRequired;
+
     @Override
     public int hashCode() {
         final int prime = 31;
@@ -57,6 +61,7 @@ public class ItemFormMetadataBean extends EntityBean implements Comparable {
         result = prime * result + (showItem ? 1231 : 1237);
         result = prime * result + ((subHeader == null) ? 0 : subHeader.hashCode());
         result = prime * result + ((widthDecimal == null) ? 0 : widthDecimal.hashCode());
+        result = prime * result + (sdvRequired ? 1231 : 1237);
         return result;
     }
 
@@ -181,8 +186,11 @@ public class ItemFormMetadataBean extends EntityBean implements Comparable {
         if (widthDecimal == null) {
             if (other.widthDecimal != null)
                 return false;
-        } else if (!widthDecimal.equals(other.widthDecimal))
+        } else if (!widthDecimal.equals(other.widthDecimal)) {
             return false;
+        } else if (sdvRequired != other.sdvRequired) {
+            return false;
+        }
         return true;
     }
 
@@ -201,6 +209,7 @@ public class ItemFormMetadataBean extends EntityBean implements Comparable {
     private String widthDecimal;
     
     private boolean showItem;
+
     // tbh 02/2010, for dynamics
 
     // New properties added in response to group-related
@@ -690,5 +699,59 @@ public class ItemFormMetadataBean extends EntityBean implements Comparable {
             return true;
         }
         return false;
+    }
+
+    public boolean isSdvRequired() {
+        return sdvRequired;
+    }
+
+    public void setSdvRequired(boolean sdvRequired) {
+        this.sdvRequired = sdvRequired;
+    }
+
+    public ItemFormMetadataBean copy() {
+        ItemFormMetadataBean ifmb = new ItemFormMetadataBean();
+        ifmb.setId(getId());
+        ifmb.setItemId(getItemId());
+        ifmb.setCrfVersionId(getCrfVersionId());
+        ifmb.setHeader(getHeader());
+        ifmb.setSubHeader(getSubHeader());
+        ifmb.setParentId(getParentId());
+        ifmb.setParentLabel(getParentLabel());
+        ifmb.setColumnNumber(getColumnNumber());
+        ifmb.setPageNumberLabel(getPageNumberLabel());
+        ifmb.setQuestionNumberLabel(getQuestionNumberLabel());
+        ifmb.setLeftItemText(getLeftItemText());
+        ifmb.setRightItemText(getRightItemText());
+        ifmb.setSectionId(getSectionId());
+        ifmb.setDescisionConditionId(getDescisionConditionId());
+        ifmb.setResponseSetId(getResponseSetId());
+        ifmb.setRegexp(getRegexp());
+        ifmb.setRegexpErrorMsg(getRegexpErrorMsg());
+        ifmb.setOrdinal(getOrdinal());
+        ifmb.setRequired(isRequired());
+        ifmb.setDefaultValue(getDefaultValue());
+        ifmb.setResponseLayout(getResponseLayout());
+        ifmb.setWidthDecimal(getWidthDecimal());
+        ifmb.setShowItem(isShowItem());
+        ifmb.setCrfVersionName(getCrfVersionName());
+        ifmb.setGroupLabel(getGroupLabel());
+        ifmb.setSectionName(getSectionName());
+        ifmb.setRepeatMax(getRepeatMax());
+        ifmb.setConditionalDisplay(getConditionalDisplay());
+        ifmb.setCrfName(getCrfName());
+        ifmb.setHighlighted(isHighlighted());
+        ifmb.setActive(isActive());
+        ifmb.setName(getName());
+        ResponseSetBean rsb = new ResponseSetBean();
+        rsb.setId(getResponseSet().getId());
+        rsb.setLabel(getResponseSet().getLabel());
+        rsb.setResponseTypeId(getResponseSet().getResponseTypeId());
+        for (ResponseOptionBean ro : (List<ResponseOptionBean>) getResponseSet().getOptions()) {
+            rsb.setOptions(ro.getText(), ro.getValue());
+        }
+        ifmb.setResponseSet(rsb);
+        ifmb.setSdvRequired(isSdvRequired());
+        return ifmb;
     }
 }

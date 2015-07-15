@@ -50,6 +50,18 @@ public class StudyParameterConfig {
     private String eventLocationRequired;
     
     private String participantPortal;
+
+    private String allowSdvWithOpenQueries;
+
+    private String showYearsInCalendar = "no";
+
+    private String secondaryIdRequired; // required, optional, or not used
+
+    private String studySubjectIdLabel;
+
+    private String secondaryIdLabel;
+
+    private String genderLabel;
                    
     public String getParticipantPortal() {
 		return participantPortal;
@@ -79,6 +91,12 @@ public class StudyParameterConfig {
         adminForcedReasonForChange = "true";
         eventLocationRequired = "not_used";
         participantPortal="disabled";
+        allowSdvWithOpenQueries = "no";
+        showYearsInCalendar = "no";
+        secondaryIdRequired = "no";
+        studySubjectIdLabel = "Study Subject ID";
+        secondaryIdLabel = "Secondary ID";
+        genderLabel = "Sex";
     }
 
     /**
@@ -300,5 +318,51 @@ public class StudyParameterConfig {
         this.eventLocationRequired = eventLocationRequired;
     }
 
+    public String getAllowSdvWithOpenQueries() {
+        return allowSdvWithOpenQueries;
+    }
 
+    public void setAllowSdvWithOpenQueries(String allowSdvWithOpenQueries) {
+        this.allowSdvWithOpenQueries = allowSdvWithOpenQueries;
+    }
+
+    public String getShowYearsInCalendar() {
+        return showYearsInCalendar;
+    }
+
+    public void setShowYearsInCalendar(String showYearsInCalendar) {
+        this.showYearsInCalendar = showYearsInCalendar;
+    }
+
+    public String getSecondaryIdRequired() {
+        return secondaryIdRequired;
+    }
+
+    public void setSecondaryIdRequired(String secondaryIdRequired) {
+        this.secondaryIdRequired = secondaryIdRequired;
+    }
+
+    public String getStudySubjectIdLabel() {
+        return studySubjectIdLabel;
+    }
+
+    public void setStudySubjectIdLabel(String studySubjectIdLabel) {
+        this.studySubjectIdLabel = studySubjectIdLabel;
+    }
+
+    public String getSecondaryIdLabel() {
+        return secondaryIdLabel;
+    }
+
+    public void setSecondaryIdLabel(String secondaryIdLabel) {
+        this.secondaryIdLabel = secondaryIdLabel;
+    }
+
+    public String getGenderLabel() {
+        return genderLabel;
+    }
+
+    public void setGenderLabel(String genderLabel) {
+        this.genderLabel = genderLabel;
+    }
 }

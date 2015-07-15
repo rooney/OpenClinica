@@ -1486,4 +1486,141 @@ public class FormBeanUtil {
             }
         }
     }
+
+    public static Map<Integer, List<ItemDataBean>> getItemDataCache(List<ItemDataBean> itemDataList, boolean onlyFirst) {
+        Map<Integer, List<ItemDataBean>> idbMap = new HashMap<Integer, List<ItemDataBean>>();
+        for (ItemDataBean itemDataBean : itemDataList) {
+            List<ItemDataBean> idList = idbMap.get(itemDataBean.getItemId());
+            if (idList == null) {
+                idList = new ArrayList<ItemDataBean>();
+                idbMap.put(itemDataBean.getItemId(), idList);
+            }
+            if (onlyFirst && idList.size() == 0) {
+                idList.add(itemDataBean);
+            } else if (!onlyFirst) {
+                idList.add(itemDataBean);
+            }
+        }
+        return idbMap;
+    }
+
+    public static Map<Integer, List<ItemDataBean>> getItemDataCache(int sectionId, int eventCrfId, ItemDataDAO iddao,
+            boolean onlyFirst) {
+        List<ItemDataBean> itemDataList = iddao.findAllActiveBySectionIdAndEventCRFId(sectionId, eventCrfId);
+        return getItemDataCache(itemDataList, onlyFirst);
+    }
+
+    public static Map<Integer, ItemFormMetadataBean> getItemFormMetadataCache(int crfVersionId,
+            ItemFormMetadataDAO ifmdao) {
+        Map<Integer, ItemFormMetadataBean> ifmdbMap = new HashMap<Integer, ItemFormMetadataBean>();
+        try {
+            ArrayList<ItemFormMetadataBean> ifmdbList = ifmdao.findAllByCRFVersionId(crfVersionId);
+            for (ItemFormMetadataBean ifmdb : ifmdbList) {
+                ifmdbMap.put(ifmdb.getItemId(), ifmdb);
+            }
+        } catch (Exception ex) {
+            logger.error("Error has occurred.", ex);
+        }
+        return ifmdbMap;
+    }
+
+    public static List<DisplayItemBean> getDisplayBeansFromItemsNew(List<ItemBean> itemBeans,
+            Map<Integer, List<ItemDataBean>> itemDataCache, Map<Integer, ItemFormMetadataBean> itemFormMetadataCache,
+            EventCRFBean eventCrfBean, int sectionId, List<String> nullValuesList,
+            ServletContext context) {
+
+        List<DisplayItemBean> disBeans = new ArrayList<DisplayItemBean>();
+        if (itemBeans == null || itemBeans.isEmpty())
+            return disBeans;
+        DisplayItemBean displayBean;
+        ItemFormMetadataBean meta;
+
+        // Add any null values to checks or radios
+        String responseName;
+        List<ResponseOptionBean> respOptions;
+        ResponseOptionBean respBean;
+
+        boolean hasNullValues = nullValuesList != null && !nullValuesList.isEmpty();
+        String tmpVal;
+        for (ItemBean iBean : itemBeans) {
+            displayBean = new DisplayItemBean();
+            meta = itemFormMetadataCache.get(iBean.getId()).copy();
+
+            // Only include Items that belong to the associated section
+            if (meta.getSectionId() == sectionId) {
+                displayBean.setItem(iBean);
+                List<ItemDataBean> itemDataBeanList = itemDataCache.get(iBean.getId());
+                ItemDataBean itemDataBean = itemDataBeanList == null || itemDataBeanList.size() == 0
+                        ? new ItemDataBean()
+                        : itemDataBeanList.get(0).copy();
+                // null values is set by adding the event def. crf bean, but
+                // here we have taken a different approach, tbh
+                // displayBean.setEventDefinitionCRF();
+                displayBean.setMetadata(runDynamicsCheck(meta, eventCrfBean, itemDataBean, context));
+                displayBean.setData(itemDataBean);
+                displayBean.setDbData(itemDataBean);
+                // System.out.println("just set: " + itemDataBean.getValue() + " from " + itemDataBean.getItemId());
+
+                responseName = displayBean.getMetadata().getResponseSet().getResponseType().getName();
+                respOptions = displayBean.getMetadata().getResponseSet().getOptions();
+                if (hasNullValues
+                        && respOptions != null
+                        && ("checkbox".equalsIgnoreCase(responseName) || "radio".equalsIgnoreCase(responseName)
+                                || "single-select".equalsIgnoreCase(responseName) || "multi-select"
+                                    .equalsIgnoreCase(responseName))) {
+
+                    for (String val : nullValuesList) {
+                        respBean = new ResponseOptionBean();
+                        // Set text to the extended version, "not
+                        // applicable"?
+                        tmpVal = DataEntryInputGenerator.NULL_VALUES_LONGVERSION.get(val);
+                        if (tmpVal != null && tmpVal.length() > 0) {
+                            respBean.setText(tmpVal);
+                        } else {
+                            respBean.setText(val);
+                        }
+
+                        respBean.setValue(val);
+                        respOptions.add(respBean);
+                    }
+                }
+                disBeans.add(displayBean);
+            }
+        }
+
+        // sort the List of DisplayItemBeans on their ordinal
+        Collections.sort(disBeans);
+        return disBeans;
+    }
+
+    public static List<DisplayItemBean> getDisplayBeansFromItemsNew(List<ItemBean> itemBeans,
+            Map<Integer, List<ItemDataBean>> itemDataCache, Map<Integer, ItemFormMetadataBean> itemFormMetadataCache,
+            EventCRFBean eventCrfBean, int sectionId, EventDefinitionCRFBean edcb, int ordinal,
+            ServletContext context) {
+        List<DisplayItemBean> disBeans = new ArrayList<DisplayItemBean>();
+        if (itemBeans == null || itemBeans.isEmpty())
+            return disBeans;
+        ItemFormMetadataBean meta;
+        DisplayItemBean displayBean;
+        for (ItemBean iBean : itemBeans) {
+            displayBean = new DisplayItemBean();
+            displayBean.setEventDefinitionCRF(edcb);
+
+            meta = itemFormMetadataCache.get(iBean.getId()).copy();
+
+            List<ItemDataBean> itemDataBeanList = itemDataCache.get(iBean.getId());
+            ItemDataBean itemDataBean = itemDataBeanList == null || itemDataBeanList.size() == 0
+                    ? new ItemDataBean()
+                    : itemDataBeanList.get(ordinal - 1).copy();
+
+            if (meta.getSectionId() == sectionId) {
+                displayBean.setItem(iBean);
+                displayBean.setMetadata(runDynamicsCheck(meta, eventCrfBean, itemDataBean, context));
+                displayBean.setData(itemDataBean);
+                disBeans.add(displayBean);
+            }
+        }
+        Collections.sort(disBeans);
+        return disBeans;
+    }
 }

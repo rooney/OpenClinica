@@ -914,4 +914,26 @@ public class EventDefinitionCRFDAO extends AuditableEntityDAO {
 
     }
 
+    /**
+     * Method updates the source data verification code for event definition crfs.
+     *
+     * @param crfVersionId
+     *            int
+     * @param sourceDataVerification
+     *            SourceDataVerification
+     * @return boolean
+     */
+    public boolean updateEDCThatHasItemsToSDV(int crfVersionId, SourceDataVerification sourceDataVerification) {
+        this.unsetTypeExpected();
+        this.setTypeExpected(1, TypeNames.INT);
+        int ind = 1;
+        HashMap<Integer, Integer> variables = new HashMap<Integer, Integer>();
+        variables.put(ind++, sourceDataVerification.getCode());
+        variables.put(ind, crfVersionId);
+
+        execute(digester.getQuery("updateEDCThatHasItemsToSDV"), variables);
+
+        return isQuerySuccessful();
+    }
+
 }

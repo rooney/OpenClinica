@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.sql.Connection;
 
 import javax.sql.DataSource;
 
@@ -35,6 +36,9 @@ import org.akaza.openclinica.dao.core.SQLFactory;
 import org.akaza.openclinica.dao.core.TypeNames;
 import org.akaza.openclinica.i18n.util.I18nFormatUtil;
 import org.akaza.openclinica.i18n.util.ResourceBundleProvider;
+import org.akaza.openclinica.bean.submit.DisplayItemBean;
+import org.akaza.openclinica.bean.submit.ItemFormMetadataBean;
+import org.akaza.openclinica.bean.submit.ItemGroupMetadataBean;
 
 /**
  * <P>
@@ -63,6 +67,8 @@ public class ItemDataDAO extends AuditableEntityDAO {
     // from database,
     // conversion is from oc_date_format pattern to local date_format pattern.
     // YW >>
+
+    public static final int INT_13 = 13;
 
     public boolean isFormatDates() {
         return formatDates;
@@ -139,7 +145,8 @@ public class ItemDataDAO extends AuditableEntityDAO {
         this.setTypeExpected(8, TypeNames.INT);// owner id
         this.setTypeExpected(9, TypeNames.INT);// update id
         this.setTypeExpected(10, TypeNames.INT);// ordinal
-        this.setTypeExpected(11, TypeNames.INT);// ordinal
+        this.setTypeExpected(11, TypeNames.INT);// old status id
+        this.setTypeExpected(12, TypeNames.BOOL);// sdv
     }
 
     public EntityBean update(EntityBean eb) {
@@ -163,7 +170,8 @@ public class ItemDataDAO extends AuditableEntityDAO {
         variables.put(new Integer(5), new Integer(idb.getUpdaterId()));
         variables.put(new Integer(6), new Integer(idb.getOrdinal()));
         variables.put(new Integer(7), new Integer(idb.getOldStatus().getId()));
-        variables.put(new Integer(8), new Integer(idb.getId()));
+        variables.put(new Integer(8), new Boolean(idb.isSdv()));
+        variables.put(new Integer(9), new Integer(idb.getId()));
         this.execute(digester.getQuery("update"), variables);
 
         if (isQuerySuccessful()) {
@@ -827,6 +835,160 @@ public class ItemDataDAO extends AuditableEntityDAO {
             vals.add((String) ((HashMap) it.next()).get("value"));
         }
         return vals;
+    }
+
+    /**
+     * Method unsdv fields in the item_data table when crf metadata was changed.
+     *
+     * @param crfVersionId
+     *            int
+     * @return boolean
+     */
+    public boolean unsdvItemDataWhenCRFMetadataWasChanged(int crfVersionId) {
+        this.unsetTypeExpected();
+        this.setTypeExpected(1, TypeNames.INT);
+
+        HashMap<Integer, Integer> variables = new HashMap<Integer, Integer>();
+        variables.put(1, crfVersionId);
+
+        execute(digester.getQuery("unsdvItemDataWhenCRFMetadataWasChanged"), variables);
+
+        return isQuerySuccessful();
+    }
+
+    /**
+     * Returns list of items that are required to be SDV.
+     * 
+     * @param eventCrfId
+     *            int
+     * @return Map
+     */
+    public List<DisplayItemBean> getListOfItemsToSDV(int eventCrfId) {
+        List<DisplayItemBean> result = new ArrayList<DisplayItemBean>();
+        setTypesExpected();
+        int ind = INT_13;
+        setTypeExpected(ind++, TypeNames.INT); // item_form_metadata_id
+        setTypeExpected(ind++, TypeNames.BOOL); // repeating
+        setTypeExpected(ind, TypeNames.INT); // section
+        HashMap<Integer, Integer> variables = new HashMap<Integer, Integer>();
+        variables.put(new Integer(1), new Integer(eventCrfId));
+        ArrayList rows = this.select(digester.getQuery("itemsToSDV"), variables);
+        for (Object row : rows) {
+            DisplayItemBean dib = new DisplayItemBean();
+
+            ItemDataBean itemDataBean = (ItemDataBean) this.getEntityFromHashMap((HashMap) row);
+            dib.setData(itemDataBean);
+
+            Integer metadataId = (Integer) ((HashMap) row).get("item_form_metadata_id");
+            Integer sectionId = (Integer) ((HashMap) row).get("section");
+            ItemFormMetadataBean ifmb = new ItemFormMetadataBean();
+            ifmb.setSectionId(sectionId != null ? sectionId : 0);
+            ifmb.setId(metadataId != null ? metadataId : 0);
+            ifmb.setSdvRequired(true);
+            dib.setMetadata(ifmb);
+
+            Boolean repeating = (Boolean) ((HashMap) row).get("repeating");
+            ItemGroupMetadataBean igmb = new ItemGroupMetadataBean();
+            igmb.setRepeatingGroup(repeating != null && repeating);
+            dib.setGroupMetadata(igmb);
+
+            result.add(dib);
+        }
+        return result;
+    }
+
+    /**
+     * Set sdv status for item data id list.
+     * 
+     * @param itemDataIds
+     *            List<Integer>
+     * @param userId
+     *            user id
+     * @param sdv
+     *            boolean
+     * @return boolean
+     */
+    public boolean sdvItems(List<Integer> itemDataIds, int userId, boolean sdv) {
+        this.unsetTypeExpected();
+        this.setTypeExpected(1, TypeNames.INT);
+
+        HashMap variables = new HashMap();
+        int ind = 1;
+        variables.put(ind++, sdv);
+        variables.put(ind++, userId);
+        variables.put(ind, sdv);
+
+        execute(digester.getQuery("sdvItems").concat(" ")
+                .concat(itemDataIds.toString().replace("[", "(").replace("]", ")")), variables);
+
+        return isQuerySuccessful();
+    }
+
+    /**
+     * SDV crf items.
+     *
+     * @param eventCrfId
+     *            int
+     * @param userId
+     *            user id
+     * @param sdv
+     *            boolean
+     * @return boolean
+     */
+    public boolean sdvCrfItems(int eventCrfId, int userId, boolean sdv) {
+        return sdvCrfItems(eventCrfId, userId, sdv, null);
+    }
+
+    /**
+     * SDV crf items.
+     * 
+     * @param eventCrfId
+     *            int
+     * @param userId
+     *            user id
+     * @param sdv
+     *            boolean
+     * @param con
+     *            Connection
+     * @return boolean
+     */
+    public boolean sdvCrfItems(int eventCrfId, int userId, boolean sdv, Connection con) {
+        this.unsetTypeExpected();
+        this.setTypeExpected(1, TypeNames.INT);
+
+        HashMap nullVars = new HashMap();
+        HashMap variables = new HashMap();
+        int ind = 1;
+        variables.put(ind++, sdv);
+        variables.put(ind++, userId);
+        variables.put(ind, eventCrfId);
+
+        execute(digester.getQuery("sdvCrfItems"), variables, nullVars, con);
+
+        return isQuerySuccessful();
+    }
+
+    /**
+     * Method returns quantity of items that need to be SDV.
+     * 
+     * @param eventCrfId
+     *            int
+     * @return int
+     */
+    public int getCountOfItemsToSDV(int eventCrfId) {
+        this.unsetTypeExpected();
+        this.setTypeExpected(1, TypeNames.INT);
+
+        HashMap<Integer, Integer> variables = new HashMap<Integer, Integer>();
+        variables.put(1, eventCrfId);
+
+        ArrayList alist = this.select(digester.getQuery("countOfItemsToSDV"), variables);
+        Iterator it = alist.iterator();
+        if (it.hasNext()) {
+            return (Integer) ((HashMap) it.next()).get("count");
+        } else {
+            return 0;
+        }
     }
 
 }

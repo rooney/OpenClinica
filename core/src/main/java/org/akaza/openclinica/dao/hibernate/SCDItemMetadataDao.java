@@ -12,6 +12,7 @@ import org.akaza.openclinica.domain.crfdata.SCDItemMetadataBean;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.math.BigInteger;
 
 public class SCDItemMetadataDao extends AbstractDomainDao<SCDItemMetadataBean>{
     
@@ -19,7 +20,6 @@ public class SCDItemMetadataDao extends AbstractDomainDao<SCDItemMetadataBean>{
     Class<SCDItemMetadataBean> domainClass() {
         return SCDItemMetadataBean.class;
     }
-    
     
     @SuppressWarnings("unchecked")
     public ArrayList<SCDItemMetadataBean> findAllBySectionId(Integer sectionId) {
@@ -45,4 +45,12 @@ public class SCDItemMetadataDao extends AbstractDomainDao<SCDItemMetadataBean>{
         q.setInteger("itemFormMetadataId", itemFormMetadataId);
         return (ArrayList<SCDItemMetadataBean>) q.list();
     }
+
+    public boolean hasSCD(Integer itemFormMetadataId) {
+        String query = "select count(distinct scd.id) from scd_item_metadata scd where scd.scd_item_form_metadata_id = :itemFormMetadataId";
+        org.hibernate.Query q = this.getCurrentSession().createSQLQuery(query);
+        q.setInteger("itemFormMetadataId", itemFormMetadataId);
+        return ((BigInteger) q.uniqueResult()).intValue() > 0;
+    }
+
 }

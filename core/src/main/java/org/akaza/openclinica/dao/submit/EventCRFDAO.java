@@ -978,5 +978,67 @@ public class EventCRFDAO<K extends String, V extends ArrayList> extends Auditabl
             this.execute(sql, variables, con);
         }
     }
+	
+    /**
+     * Method unsdvs event crfs when crf metadata was changed.
+     *
+     * @param crfVersionId
+     *            crf version id
+     * @param userId
+     *            user id
+     * @return boolean
+     */
+    public boolean unsdvEventCRFsWhenCRFMetadataWasChanged(int crfVersionId, int userId) {
+        unsetTypeExpected();
 
+        HashMap<Integer, Integer> variables = new HashMap<Integer, Integer>();
+        int ind = 1;
+        variables.put(ind++, userId);
+        variables.put(ind, crfVersionId);
+
+        execute(digester.getQuery("unsdvEventCRFsWhenCRFMetadataWasChanged"), variables);
+
+        return isQuerySuccessful();
+    }
+
+    /**
+     * Method sdvs event crfs when crf metadata was changed and al items are sdv.
+     *
+     * @param crfVersionId
+     *            crf version id
+     * @param userId
+     *            user id
+     * @param ignoreOutstandingQueries
+     *            boolean
+     * @return boolean
+     */
+    public boolean sdvEventCRFsWhenCRFMetadataWasChangedAndAllItemsAreSDV(int crfVersionId, int userId,
+            boolean ignoreOutstandingQueries) {
+        unsetTypeExpected();
+
+        HashMap<Integer, Integer> variables = new HashMap<Integer, Integer>();
+        int ind = 1;
+        variables.put(ind++, userId);
+        variables.put(ind, crfVersionId);
+
+        execute(digester.getQuery(ignoreOutstandingQueries
+                ? "sdvEventCRFsWhenCRFMetadataWasChangedAndAllItemsAreSDV"
+                : "sdvEventCRFsWithoutOutstandingDNsWhenCRFMetadataWasChangedAndAllItemsAreSDV"), variables);
+        return isQuerySuccessful();
+    }
+
+    /**
+     * Method returns all started event crfs by study event.
+     * 
+     * @param studyEvent
+     *            StudyEventBean
+     * @return ArrayList
+     */
+    public ArrayList findAllStartedByStudyEvent(StudyEventBean studyEvent) {
+        HashMap variables = new HashMap();
+        variables.put(1, studyEvent.getId());
+
+        return executeFindAllQuery("findAllStartedByStudyEvent", variables);
+    }
+    
 }

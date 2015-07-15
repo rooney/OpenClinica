@@ -90,6 +90,8 @@ public class OpenRosaXmlGenerator {
 	private SectionDAO sdao;
 	protected final Logger logger = LoggerFactory.getLogger(getClass().getName());
 
+	private static final String TYPE = "OpenRosaXmlGenerator";
+
 	public OpenRosaXmlGenerator(CoreResources core, DataSource dataSource, RuleActionPropertyDao ruleActionPropertyDao) throws Exception {
 		this.dataSource = dataSource;
 		this.coreResources = core;
@@ -112,14 +114,14 @@ public class OpenRosaXmlGenerator {
 	 * @return
 	 * @throws Exception
 	 */
-	public String buildForm(String formId) throws Exception {
+	public String buildForm(String formId, SCDItemMetadataDao scdItemMetadataDao) throws Exception {
 		try {
 			CRFVersionDAO versionDAO = new CRFVersionDAO(dataSource);
 			CRFVersionBean crfVersion = versionDAO.findByOid(formId);
 			CRFDAO crfDAO = new CRFDAO(dataSource);
 			CRFBean crf = (CRFBean) crfDAO.findByPK(crfVersion.getCrfId());
 			CRFVersionMetadataUtil metadataUtil = new CRFVersionMetadataUtil(dataSource);
-			ArrayList<SectionBean> crfSections = metadataUtil.retrieveFormMetadata(crfVersion);
+			ArrayList<SectionBean> crfSections = metadataUtil.retrieveFormMetadata(crfVersion, TYPE, scdItemMetadataDao);
 
 			StringWriter writer = new StringWriter();
 			IOUtils.copy(getClass().getResourceAsStream("/properties/xform_template.xml"), writer, "UTF-8");

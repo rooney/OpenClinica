@@ -11,7 +11,9 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 
 import javax.annotation.Resources;
 
@@ -51,6 +53,8 @@ public class CoreResources implements ResourceLoaderAware {
     public static final Integer CDISC_ODM_1_3_ID = 3;
     public static final Integer CDISC_ODM_1_3_EXTENSION_ID = 2;
     public static final Integer SPSS_ID = 9;
+
+    public static final Set<String> CALENDAR_LOCALES = new HashSet<String>();
 
     private static String webapp;
     protected final static Logger logger = LoggerFactory.getLogger("org.akaza.openclinica.dao.core.CoreResources");

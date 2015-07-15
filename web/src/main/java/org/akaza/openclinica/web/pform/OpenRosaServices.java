@@ -160,7 +160,7 @@ public class OpenRosaServices {
 
         try {
             OpenRosaXmlGenerator generator = new OpenRosaXmlGenerator(coreResources, dataSource, ruleActionPropertyDao);
-            xform = generator.buildForm(formId);
+            xform = generator.buildForm(formId, getScdItemMetadataDao());
         } catch (Exception e) {
             LOGGER.error(e.getMessage());
             LOGGER.error(ExceptionUtils.getStackTrace(e));

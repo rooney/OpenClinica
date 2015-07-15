@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog/1.9" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog/1.9 http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-1.9.xsd">
+
+	<changeSet author="panduwana" id="2015-07-08-OC">
+        <comment>Insert the new "evaluated_crf" column into the event_definition_crf table</comment>
+        <addColumn tableName="event_definition_crf" >
+              <column name="evaluated_crf" type="boolean" defaultValueBoolean="false"/>
+   		</addColumn>
+   	</changeSet>
+</databaseChangeLog>

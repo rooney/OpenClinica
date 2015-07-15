@@ -1,0 +1,424 @@
+table.widgets_container {
+	width: 800px;
+	margin: 10px 0;
+	border-spacing: 3px;
+}
+
+table.widgets_container td {
+	vertical-align: top;
+	width: 400px;
+}
+
+.widget,.widget_big {
+	height: auto;
+	padding: 5px;
+	border: 1px solid gray;
+	background-color: white;
+}
+
+.widget {
+	width: 380px;
+	margin: 6px 0;
+}
+
+.widget_big {
+	width: 778px;
+	margin-bottom: 6px;
+}
+
+.widget .widget_error_message,.widget_big .widget_error_message {
+	color: red;
+	font-weight: bold;
+	margin: 15px;
+}
+
+.toolbar_wrapper {
+	height: 98%;
+	position: fixed;
+	right: 0;
+	top: 0;
+	vertical-align: top;
+	width: 420px;
+	padding: 5px;
+	border: 1px solid gray;
+	background-color: white;
+	z-index: 5;
+}
+
+.toolbar_wrapper h2 {
+	width: auto;
+	padding: 1px 10px;
+	margin: 0;
+	color: white;
+	font-family: Tahoma, Arial, Helvetica, Sans-Serif;
+	font-size: 11px;
+}
+
+.toolbar_wrapper .note {
+	padding-bottom: 10px;
+	padding-left: 10px;
+	background-image: url(../../images/dots.gif);
+	background-repeat: repeat-x;
+	background-position: bottom;
+}
+
+.toolbar_wrapper #scroll-container {
+	overflow-x: hidden;
+	overflow-y: scroll;
+	max-height: 87%;
+	height: 87%;
+	border: 1px solid gray;
+	padding: 3px;
+}
+
+#show_hide {
+	width: 60px;
+	height: 20px;
+	text-align: center;
+	vertical-align: middle;
+	color: white;
+}
+
+.show_hide_link {
+	position: absolute;
+	left: -60px;
+	bottom: 10px;
+}
+
+.widget h2,.widget_big h2 {
+	margin: 3px 3px;
+	padding: 1px 10px;
+	width: auto;
+	color: white;
+	font-family: Tahoma, Arial, Helvetica, Sans-Serif;
+	font-size: 11px;
+	text-align: center;
+}
+
+.widget .remove,.widget_big  .remove {
+	display: none;
+}
+
+.widget .bar_name, .widget .bar_name a,.widget .bar_name a:hover {
+	text-align: center;
+	padding-top: 5px;
+	font-style: normal;
+	color: #4D4D4D;
+}
+
+.configure .widget:hover .remove,.configure .widget_big:hover .remove {
+	width: 20px;
+	height: 20px;
+	display: block;
+	position: absolute;
+	border: none;
+}
+
+.configure .widget:hover .remove {
+	margin-left: 360px;
+}
+
+.configure .widget_big:hover .remove {
+	margin-left: 760px;
+}
+
+form#actionForSave input {
+	display: none;
+}
+
+.filler {
+	visibility: hidden;
+	height: 1px;
+	display: block;
+	margin: 1px 0;
+}
+
+#toolbar_tc,#toolbar {
+	min-height: 40px;
+	padding-bottom: 5px;
+	padding-top: 5px;
+}
+
+.ui-sortable-placeholder {
+	visibility: visible !important;
+	border: 1px dashed !important;
+}
+
+.ui-placeholder-big {
+	visibility: visible;
+	border: 1px dashed;
+	height: 100%;
+}
+
+/*Charts*/
+/*Stacked-chart*/
+.widget .chart_wrapper {
+	width: 330px;
+	border-bottom: 1px solid gray;
+	border-left: 1px solid gray;
+	padding: 10px 0;
+	margin-top: 20px;
+}
+
+.widget .enrollment_status_per_site .chart_wrapper {
+	width: 300px;
+}
+
+.widget .enrollment_status_per_site table.captions {
+	width: 385px;
+	margin-left: 0;
+}
+
+.widget .stacked_bar {
+	height: 20px;
+	padding: 0;
+	margin: 0;
+}
+
+.widget .stacked_bar li {
+	display: inline-block !important;
+	width: 0;
+	height: 20px;
+	margin-right: -3px;
+}
+
+@-moz-document url-prefix() {
+.stacked_bar li {
+	display: inline-block !important;
+	width: 0;
+    height: 20px;
+	margin-right: 0;
+	margin-left: -1px;
+}
+}
+
+.widget .stack .pop-up {
+	display: none;
+}
+
+.widget .stack:hover .pop-up {
+	background-color: white;
+	border: 1px solid gray;
+	position: absolute;
+	width: 30px;
+	height: 15px;
+	display: block;
+	margin-top: -10px;
+	text-align: center;
+	font-weight: bold;
+}
+
+.widget .stack .pop-up-visible {
+	color: white;
+	position: absolute;
+	display: table;
+	text-align: center;
+}
+
+.widget .popup_legend_min {
+	background-image: url(../../images/popup_small.png);
+	font-weight: bold;
+	text-align:center;
+	margin-left:-7px;
+	width: 56px;
+	height: 29px;
+	display: none;
+	position: absolute;
+	z-index: 1;
+}
+
+.widget .popup_legend_medium {
+	background-image: url(../../images/popup_mid.png);
+	background-repeat: no-repeat;
+	margin-left:-39px;
+	text-align:left;
+	position: absolute;
+	z-index: 1;
+	display: none;
+	height: 50px;
+	width: 120px;
+}
+
+.widget .popup_legend_medium p {
+	margin-left: 5px;
+	margin-top: 5px;
+}
+
+.widget table.captions {
+	position: relative;
+	width: 410px;
+	margin-left: -15px;
+}
+
+.widget table.captions td,table.captions_percents td {
+	text-align: center;
+}
+
+.widget table.captions_percents {
+	position: relative;
+	width: 360px;
+}
+
+.widget table.signs {
+	margin: 15px 20px;
+	vertical-align: middle;
+	width: 360px;
+}
+
+.widget .events_completion table.signs {
+	margin-top: 15px;
+	margin-bottom: 5px;
+	margin-left: 35px;
+}
+
+.widget table.signs td {
+	vertical-align: middle;
+}
+
+.widget table.signs td.optional,.dns_assigned_to_me a.optional {
+	display: none;
+}
+
+.widget div.sign {
+	position: relative;
+	top: 3px;
+	width: 10px;
+	height: 10px;
+	display: inline-block;
+}
+
+.widget .notes {
+	width: 360px
+}
+
+.widget .hidden {
+	display: none;
+}
+
+.widget .notes td {
+	color: gray;
+	font-family: Tahoma, Arial, Helvetica, Sans-Serif;
+	font-size: 11px;
+	text-align: center;
+}
+
+.widget #bar_name {
+	top: 3px;
+	width: 330px;
+	display: block;
+	text-align: center;
+	color: black;
+	font-family: Tahoma, Arial, Helvetica, Sans-Serif;
+	font-size: 11px;
+	font-weight: bold;
+}
+
+.widget input#previous,.widget input#next {
+	display: none;
+}
+
+.widget_big .description {
+	display: none;
+}
+
+.widget_big .tc_content {
+	display: block;
+}
+
+.widget form.hidden {
+	display: none;
+}
+
+.widget div.right_text {
+    margin-top: -17px;
+    font-family: Tahoma, Arial, Helvetica, Sans-Serif;
+    font-size: 10px;
+}
+
+.widget .hint {
+    font-family: Tahoma, Arial, Helvetica, Sans-Serif;
+    font-size: 10px;
+    font-style: italic;
+    color: gray;
+}
+/* DNs assigned to me */
+.dns_assigned_to_me .new {
+	background-color: red;
+}
+
+.dns_assigned_to_me table.signs {
+	width: 260px;
+	margin-left: 60px;
+}
+
+.enrollment_status_per_site table.signs {
+	width: 260px;
+	margin: 38px 80px;
+}
+
+.enrollment_status_per_site .bar_name {
+	padding-top: 6px;
+	padding-bottom: 1px;
+}
+
+.dns_assigned_to_me .updated {
+	background-color: #e5a200;
+}
+
+.dns_assigned_to_me .closed {
+	background-color: #32a656;
+}
+
+.dns_assigned_to_me .resolution_proposed {
+	background-color: black;
+}
+/* /DNs assigned to me */
+
+/* Events Completion */
+.events_completion ul.stacked_bar,.events_completion .not_cheduled {
+	background-color: #ecf8ff;
+}
+
+.widget .scheduled {
+	background-color: #12d2ff;
+}
+
+.widget .data_entry_started {
+	background-color: #ffc700;
+}
+
+.widget .completed {
+	background-color: #9439c4;
+}
+
+.widget .signed {
+	background-color: #029f32;
+}
+
+.widget  .locked {
+	background-color: #868686;
+}
+
+.widget .skipped {
+	background-color: #ff6301;
+}
+
+.widget .stopped {
+	background-color: #ff0000;
+}
+
+.widget  .sdved,.widget .source_data_verified {
+	background-color: #8ac819;
+}
+
+.widget  .stacked_bar,.widget .not_scheduled {
+	background-color: #ecf8ff;
+}
+
+.widget .removed {
+	background-color: #ff0000;
+}
+
+.widget .available {
+	background-color: #12d2ff;
+}

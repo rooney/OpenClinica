@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE taglib PUBLIC
+        "-//Sun Microsystems, Inc.//DTD JSP Tag Library 1.1//EN"
+        "http://java.sun.com/j2ee/dtds/web-jsptaglibrary_1_1.dtd">
+
+<taglib>
+    <tlibversion>1.0</tlibversion>
+    <jspversion>2.1</jspversion>
+    <shortname>UI Module JSP tag library</shortname>
+
+    <tag>
+        <name>calendar</name>
+        <tagclass>org.akaza.openclinica.view.tags.CalendarTag</tagclass>
+        <bodycontent>empty</bodycontent>
+    </tag>
+
+    <tag>
+        <name>theme</name>
+        <tagclass>org.akaza.openclinica.view.tags.ThemeTag</tagclass>
+        <bodycontent>empty</bodycontent>
+    </tag>
+
+    <tag>
+		<name>calendarIcon</name>
+		<tagclass>org.akaza.openclinica.view.tags.CalendarIconTag</tagclass>
+		<bodycontent>empty</bodycontent>
+		<attribute>
+			<name>alt</name>
+			<required>false</required>
+			<rtexprvalue>true</rtexprvalue>
+		</attribute>
+		<attribute>
+			<name>title</name>
+			<required>false</required>
+			<rtexprvalue>true</rtexprvalue>
+		</attribute>
+		<attribute>
+			<name>dateFormat</name>
+			<required>false</required>
+			<rtexprvalue>true</rtexprvalue>
+		</attribute>
+		<attribute>
+			<name>linkName</name>
+			<required>false</required>
+			<rtexprvalue>true</rtexprvalue>
+		</attribute>
+		<attribute>
+			<name>linkId</name>
+			<required>false</required>
+			<rtexprvalue>true</rtexprvalue>
+		</attribute>
+		<attribute>
+			<name>onClickSelector</name>
+			<required>true</required>
+			<rtexprvalue>true</rtexprvalue>
+		</attribute>
+		<attribute>
+			<name>imageId</name>
+			<required>false</required>
+			<rtexprvalue>true</rtexprvalue>
+		</attribute>
+		<attribute>
+			<name>checkIfShowYear</name>
+			<required>false</required>
+			<rtexprvalue>true</rtexprvalue>
+        </attribute>
+    </tag>
+
+</taglib>

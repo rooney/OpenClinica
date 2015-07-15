@@ -30,6 +30,10 @@ public class EventDefinitionCRFBean extends AuditableEntityBean implements Compa
 
     private int studyId = 0;
 
+    private boolean evaluatedCRF = false;
+
+    private ArrayList<SourceDataVerification> sdvOptions = new ArrayList<SourceDataVerification>();
+
     @Override
     public int hashCode() {
         final int prime = 31;
@@ -59,6 +63,8 @@ public class EventDefinitionCRFBean extends AuditableEntityBean implements Compa
         result = prime * result + studyEventDefinitionId;
         result = prime * result + studyId;
         result = prime * result + ((versions == null) ? 0 : versions.hashCode());
+        result = prime * result + (evaluatedCRF ? 1231 : 1237);
+        result = prime * result + ((tabbingMode == null) ? 0 : tabbingMode.hashCode());
         return result;
     }
 
@@ -154,6 +160,14 @@ public class EventDefinitionCRFBean extends AuditableEntityBean implements Compa
                 return false;
         } else if (!versions.equals(other.versions))
             return false;
+        if (evaluatedCRF != other.evaluatedCRF)
+            return false;
+        if (tabbingMode == null) {
+            if (other.tabbingMode != null) {
+                return false;
+            }
+        } else if (!tabbingMode.equals(other.tabbingMode))
+            return false;
         return true;
     }
 
@@ -177,6 +191,7 @@ public class EventDefinitionCRFBean extends AuditableEntityBean implements Compa
     private String selectedVersionIds = "";
     private int parentId = 0;
     private boolean participantForm =false;
+    private String tabbingMode;
 
     //Not in db
     private String eventName;
@@ -592,5 +607,28 @@ public class EventDefinitionCRFBean extends AuditableEntityBean implements Compa
 		this.participantForm = participantForm;
 	}
 
+    public ArrayList<SourceDataVerification> getSdvOptions() {
+        return sdvOptions;
+    }
+
+    public void setSdvOptions(ArrayList<SourceDataVerification> sdvOptions) {
+        this.sdvOptions = sdvOptions;
+    }
+
+    public boolean isEvaluatedCRF() {
+        return evaluatedCRF;
+    }
+
+    public void setEvaluatedCRF(boolean evaluatedCRF) {
+        this.evaluatedCRF = evaluatedCRF;
+    }
+
+    public String getTabbingMode() {
+        return tabbingMode;
+    }
+
+    public void setTabbingMode(String tabbingMode) {
+        this.tabbingMode = tabbingMode;
+    }
 	
 }

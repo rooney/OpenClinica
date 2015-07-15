@@ -186,7 +186,8 @@
                     default_value =?,
                     response_layout =?,
                     width_decimal =?,
-                    show_item =?
+                    show_item =?,
+                    sdv_required =?
 			WHERE item_form_metadata_id = ?
 		</sql>
 	</query>
@@ -290,4 +291,10 @@
          and ifm.response_set_id = rs.response_set_id limit 1
          </sql>
 	</query>
+	<query>
+        <name>hasItemsToSDV</name>
+        <sql>
+            select count(distinct cv.crf_id) = 1 as has from crf_version cv, item_form_metadata ifm where cv.crf_id = ? and ifm.crf_version_id = cv.crf_version_id and ifm.sdv_required = true
+        </sql>
+    </query>
 </queries>

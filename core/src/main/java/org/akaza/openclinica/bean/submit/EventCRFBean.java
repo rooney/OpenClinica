@@ -11,6 +11,7 @@ import org.akaza.openclinica.bean.admin.CRFBean;
 import org.akaza.openclinica.bean.core.AuditableEntityBean;
 import org.akaza.openclinica.bean.core.DataEntryStage;
 import org.akaza.openclinica.bean.core.Status;
+import org.akaza.openclinica.bean.login.UserAccountBean;
 import org.akaza.openclinica.bean.managestudy.StudyEventBean;
 import org.akaza.openclinica.bean.managestudy.StudySubjectBean;
 
@@ -48,6 +49,8 @@ public class EventCRFBean extends AuditableEntityBean {
     private String eventName = "";
     private String studyName = "";
     private int eventOrdinal = 1;
+    private boolean notStarted = true;
+    private UserAccountBean doubleDataOwner = new UserAccountBean(); // not in db
 
     private StudySubjectBean studySubject;
     private StudyEventBean studyEvent;
@@ -93,6 +96,7 @@ public class EventCRFBean extends AuditableEntityBean {
         this.ownerId = eventCRFBean.getOwnerId();
         this.createdDate = eventCRFBean.getCreatedDate();
         this.updaterId = eventCRFBean.getUpdaterId();
+        this.notStarted = eventCRFBean.isNotStarted();
     }
 
     public EventCRFBean copy() {
@@ -512,6 +516,22 @@ public class EventCRFBean extends AuditableEntityBean {
         this.sdvUpdateId = sdvUpdateId;
     }
 
+    public boolean isNotStarted() {
+        return notStarted;
+    }
+
+    public void setNotStarted(boolean notStarted) {
+        this.notStarted = notStarted;
+    }
+
+    public UserAccountBean getDoubleDataOwner() {
+        return doubleDataOwner;
+    }
+
+    public void setDoubleDataOwner(UserAccountBean doubleDataOwner) {
+        this.doubleDataOwner = doubleDataOwner;
+    }
+
 	public StudySubjectBean getStudySubject() {
 		return studySubject;
 	}
@@ -527,5 +547,4 @@ public class EventCRFBean extends AuditableEntityBean {
 	public void setStudyEvent(StudyEventBean studyEvent) {
 		this.studyEvent = studyEvent;
 	}
-
 }

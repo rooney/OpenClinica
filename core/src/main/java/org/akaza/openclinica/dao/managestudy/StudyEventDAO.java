@@ -17,6 +17,7 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
 
 import javax.sql.DataSource;
 
@@ -1215,5 +1216,22 @@ public class StudyEventDAO extends AuditableEntityDAO implements Listener {
     public void setObserver(Observer observer) {
 		this.observer = observer;
 	}
+
+    /**
+     * Method returns all study events by crf version and subject event status.
+     * 
+     * @param crfVersionId
+     *            int
+     * @param subjectEventStatus
+     *            SubjectEventStatus
+     * @return List<StudyEventBean>
+     */
+    public List<StudyEventBean> findStudyEventsByCrfVersionAndSubjectEventStatus(int crfVersionId,
+            SubjectEventStatus subjectEventStatus) {
+        HashMap variables = new HashMap();
+        variables.put(1, crfVersionId);
+        variables.put(2, subjectEventStatus.getId());
+        return executeFindAllQuery("findStudyEventsByCrfVersionAndSubjectEventStatus", variables);
+    }
 
 }

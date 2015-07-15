@@ -13,9 +13,12 @@ import org.akaza.openclinica.bean.core.Status;
 import org.akaza.openclinica.bean.core.SubjectEventStatus;
 import org.akaza.openclinica.patterns.ocobserver.Listener;
 import org.akaza.openclinica.patterns.ocobserver.Observer;
+import org.akaza.openclinica.util.SignedData;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author jxu
@@ -57,6 +60,10 @@ public class StudyEventBean extends AuditableEntityBean implements Listener {
     private int repeatingNum = 1;
 
     private ArrayList<StudyEventBean> repeatEvents = new ArrayList<StudyEventBean>();
+
+    private Map<Integer, SignedData> signedData = new HashMap<Integer, SignedData>();
+
+    private SubjectEventStatus prevSubjectEventStatus = SubjectEventStatus.INVALID;
 
     // A. Hamid.
     // will the edit icon be appeared
@@ -372,4 +379,20 @@ public class StudyEventBean extends AuditableEntityBean implements Listener {
 		// TODO Auto-generated method stub
 		return null;
 	}
+
+    public void setSignedData(Map<Integer, SignedData> signedData) {
+        this.signedData = signedData;
+    }
+
+    public Map<Integer, SignedData> getSignedData() {
+        return signedData;
+    }
+
+    public SubjectEventStatus getPrevSubjectEventStatus() {
+        return prevSubjectEventStatus;
+    }
+
+    public void setPrevSubjectEventStatus(SubjectEventStatus prevSubjectEventStatus) {
+        this.prevSubjectEventStatus = prevSubjectEventStatus;
+    }
 }

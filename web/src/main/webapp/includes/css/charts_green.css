@@ -1,0 +1,15 @@
+.widget h2, .widget_big h2 {
+	background-color:#75b894;
+}
+
+.toolbar_wrapper h2 {
+	background-color:#75b894;
+}
+
+.ui-sortable-placeholder, .ui-placeholder-big {
+  border-color: #75b894!important;
+}
+
+#show_hide {
+	background-color:#75b894;
+}
