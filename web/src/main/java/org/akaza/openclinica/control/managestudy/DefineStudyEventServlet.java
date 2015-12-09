@@ -45,6 +45,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import org.akaza.openclinica.exception.StudyMissingParticipatePortalException;
 
 /**
  * @author jxu
@@ -114,8 +115,15 @@ public class DefineStudyEventServlet extends SecureController {
             forwardPage(Page.DEFINE_STUDY_EVENT1);
         } else {
             if ("confirm".equalsIgnoreCase(actionName)) {
-                confirmWholeDefinition();
-
+                try {
+                    confirmWholeDefinition();
+                } catch (StudyMissingParticipatePortalException e) {
+                    addPageMessage(respage.getString("the_new_event_definition_creation_cancelled"));
+                    addPageMessage(respage.getString("study_missing_participate_portal"));
+                    ArrayList pageMessages = (ArrayList) request.getAttribute(PAGE_MESSAGE);
+                    session.setAttribute("pageMessages", pageMessages);
+                    response.sendRedirect(request.getContextPath() + Page.LIST_DEFINITION_SERVLET.getFileName());
+                }
             } else if ("submit".equalsIgnoreCase(actionName)) {
                 // put a try catch in here to fix task # 1642 in Mantis, added
                 // 092007 tbh
@@ -162,25 +170,33 @@ public class DefineStudyEventServlet extends SecureController {
                 // above added 092007 tbh
 
             } else if ("next".equalsIgnoreCase(actionName)) {
-                Integer pageNumber = Integer.valueOf(request.getParameter("pageNum"));
-                if (pageNumber != null) {
-                    if (pageNumber.intValue() == 2) {
-                        String nextListPage = request.getParameter("next_list_page");
-                        if (nextListPage != null && nextListPage.equalsIgnoreCase("true")) {
-                            confirmDefinition1();
+                try {
+                    Integer pageNumber = Integer.valueOf(request.getParameter("pageNum"));
+                    if (pageNumber != null) {
+                        if (pageNumber.intValue() == 2) {
+                            String nextListPage = request.getParameter("next_list_page");
+                            if (nextListPage != null && nextListPage.equalsIgnoreCase("true")) {
+                                confirmDefinition1();
+                            } else {
+                                confirmDefinition2();
+                            }
                         } else {
-                            confirmDefinition2();
+                            confirmDefinition1();
                         }
                     } else {
-                        confirmDefinition1();
+                        if (session.getAttribute("definition") == null) {
+                            StudyEventDefinitionBean sed = new StudyEventDefinitionBean();
+                            sed.setStudyId(currentStudy.getId());
+                            session.setAttribute("definition", sed);
+                        }
+                        forwardPage(Page.DEFINE_STUDY_EVENT1);
                     }
-                } else {
-                    if (session.getAttribute("definition") == null) {
-                        StudyEventDefinitionBean sed = new StudyEventDefinitionBean();
-                        sed.setStudyId(currentStudy.getId());
-                        session.setAttribute("definition", sed);
-                    }
-                    forwardPage(Page.DEFINE_STUDY_EVENT1);
+                } catch (StudyMissingParticipatePortalException e) {
+                    addPageMessage(respage.getString("the_new_event_definition_creation_cancelled"));
+                    addPageMessage(respage.getString("study_missing_participate_portal"));
+                    ArrayList pageMessages = (ArrayList) request.getAttribute(PAGE_MESSAGE);
+                    session.setAttribute("pageMessages", pageMessages);
+                    response.sendRedirect(request.getContextPath() + Page.LIST_DEFINITION_SERVLET.getFileName());
                 }
             }
         }
@@ -601,15 +617,23 @@ public class DefineStudyEventServlet extends SecureController {
         addPageMessage(respage.getString("the_new_event_definition_created_succesfully"));
 
     }
-    private void baseUrl() throws MalformedURLException{
+    private void baseUrl() throws StudyMissingParticipatePortalException {
     	String portalURL = CoreResources.getField("portalURL");
-        URL pManageUrl = new URL(portalURL);
+        URL pManageUrl;
+        try {
+            pManageUrl = new URL(portalURL);
+        } catch (MalformedURLException e) {
+            throw new StudyMissingParticipatePortalException("Invalid URL in `portalURL` configuration item.", e);
+        }
         StudyDAO studyDao = new StudyDAO(sm.getDataSource());
 
-    ParticipantPortalRegistrar registrar = new ParticipantPortalRegistrar();
-    Authorization pManageAuthorization = registrar.getAuthorization(currentStudy.getOid());
-         String url = pManageUrl.getProtocol() + "://" + pManageAuthorization.getStudy().getHost() + "." + pManageUrl.getHost()
-                    + ((pManageUrl.getPort() > 0) ? ":" + String.valueOf(pManageUrl.getPort()) : "");
+        ParticipantPortalRegistrar registrar = new ParticipantPortalRegistrar();
+        Authorization pManageAuthorization = registrar.getAuthorization(currentStudy.getOid());
+        if (pManageAuthorization == null) {
+            throw new StudyMissingParticipatePortalException("No participate portal assigned to study");
+        }
+        String url = pManageUrl.getProtocol() + "://" + pManageAuthorization.getStudy().getHost() + "." + pManageUrl.getHost()
+                + ((pManageUrl.getPort() > 0) ? ":" + String.valueOf(pManageUrl.getPort()) : "");
     	System.out.println("the url :  "+ url);
     	request.setAttribute("participantUrl",url+"/");
 
