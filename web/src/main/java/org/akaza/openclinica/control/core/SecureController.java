@@ -376,6 +376,15 @@ public abstract class SecureController extends HttpServlet implements SingleThre
             session.setMaxInactiveInterval(3600);
         }
 
+        // If session has page messages, move them to request object for template rendering.
+        // This is usually from a form submission that proceeded with immediate url redirect.
+        if (session.getAttribute("pageMessages") != null) {
+            ArrayList pageMessages = new ArrayList();
+            pageMessages.addAll((ArrayList) session.getAttribute("pageMessages"));
+            request.setAttribute("pageMessages", pageMessages);
+            session.removeAttribute("pageMessages");
+        }
+
         // If the session already has a value with key SUPPORT_URL don't reset
         if (session.getAttribute(SUPPORT_URL) == null) {
             session.setAttribute(SUPPORT_URL, SQLInitServlet.getSupportURL());
@@ -546,6 +555,7 @@ public abstract class SecureController extends HttpServlet implements SingleThre
                 currentRole.setStatus(Status.DELETED);
                 session.setAttribute("userRole", currentRole);
             }
+
             // YW 06-19-2007 >>
 
             request.setAttribute("isAdminServlet", getAdminServlet());
