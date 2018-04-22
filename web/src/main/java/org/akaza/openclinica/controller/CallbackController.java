@@ -76,13 +76,15 @@ public class CallbackController {
                 }
             } else {
                 logger.info("CallbackController In not login_required:%%%%%%%%");
-                Tokens tokens = controller.handle(req);
-                DecodedJWT decodedJWT = JWT.decode(tokens.getAccessToken());
+                String accessToken = req.getParameter("token");
+                if (accessToken == null)
+                    accessToken = controller.handle(req).getAccessToken();
+                DecodedJWT decodedJWT = JWT.decode(accessToken);
 
                 TokenAuthentication tokenAuth = new TokenAuthentication(decodedJWT);
                 SecurityContextHolder.getContext().setAuthentication(tokenAuth);
                 CoreResources.setRequestSchema(req, "public");
-                req.getSession().setAttribute("accessToken", tokens.getAccessToken());
+                req.getSession().setAttribute("accessToken", accessToken);
                 Auth0User user = new Auth0User(decodedJWT);
                 UserAccountHelper userAccountHelper = null;
                 try {
@@ -132,7 +134,11 @@ public class CallbackController {
                 logger.info("CallbackController returnTo URL:%%%%%%%%" + returnTo);
                 logger.info("param:" + param);
 
-                res.sendRedirect(returnTo + param);
+                res.sendRedirect("http://localhost:8080/OpenClinica" + (
+                        req.getParameter("token") == null ? 
+                        "/pages/callback?token=" + accessToken :
+                        "/MainMenu"
+                ));
             }
         } catch (InvalidRequestException e) {
             logger.error("CallbackController:" + e);

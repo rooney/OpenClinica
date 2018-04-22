@@ -45,11 +45,16 @@ public class Auth0Controller {
 
     public String buildAuthorizeUrl(HttpServletRequest request, boolean sso) {
         int port = request.getServerPort();
+        String serverName = request.getServerName();
+        if (StringUtils.equals("localhost", serverName)) {
+            serverName = "adi.ngrok.io";
+            port = 80;
+        }
         String portStr ="";
         if (port != 80 && port != 443) {
             portStr = ":" + port;
         }
-        String redirectUri = request.getScheme() + "://" + request.getServerName() + portStr + request.getContextPath() + "/pages/callback";
+        String redirectUri = request.getScheme() + "://" + serverName + portStr + request.getContextPath() + "/pages/callback";
         return this.buildAuthorizeUrl(request, redirectUri, sso);
     }
 

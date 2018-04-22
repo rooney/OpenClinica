@@ -67,6 +67,7 @@ import org.akaza.openclinica.view.Page;
 import org.akaza.openclinica.web.InsufficientPermissionException;
 import org.akaza.openclinica.web.bean.DisplayStudyEventRow;
 import org.akaza.openclinica.web.bean.EntityBeanTable;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
 /**
