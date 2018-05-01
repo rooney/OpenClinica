@@ -452,7 +452,10 @@ $(function() {
                         });
                     },
                     stateLoadCallback: function(settings, callback) {
-                        callback(store.data.datatables[i]);
+                        var data = store.data.datatables[i];
+                        callback(data);
+                        if (!data)
+                            this.fnSortNeutral();
                     },
                     dom: "frtilp",
                     language: {
