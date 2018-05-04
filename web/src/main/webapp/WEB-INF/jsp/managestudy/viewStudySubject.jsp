@@ -220,7 +220,7 @@
 <jsp:useBean scope='request' id='crf' class='org.akaza.openclinica.bean.admin.CRFBean'/>
 <h1 id="header">
   <span class="title_manage">
-    Subject <c:out value="${studySub.label}"/>
+    Participant <c:out value="${studySub.label}"/>
   </span>
 </h1>
 <input type="button" class="invisible orange" id="reset-all-filters" value="Custom View On &nbsp; &times;" onclick="resetAllFilters();">
