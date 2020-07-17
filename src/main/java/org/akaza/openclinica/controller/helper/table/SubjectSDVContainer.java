@@ -33,6 +33,7 @@ public class SubjectSDVContainer {
     //100% Required, Partial Required, 100% and Partial, Not Required
     private String sdvRequirementDefinition;
     private String lockStatus;
+    private String signedStatus;
     private String subjectEventStatus;
     private Date lastUpdatedDate;
     private String lastUpdatedBy;
@@ -57,6 +58,7 @@ public class SubjectSDVContainer {
         crfName = "";
         sdvRequirementDefinition = "";
         lockStatus = "";
+        signedStatus = "";
         subjectEventStatus = "";
         lastUpdatedDate = null;
         lastUpdatedBy = "";
@@ -187,6 +189,14 @@ public class SubjectSDVContainer {
 
     public void setLockStatus(String lockStatus) {
         this.lockStatus = lockStatus;
+    }
+
+    public String getSignedStatus() {
+        return signedStatus;
+    }
+
+    public void setSignedStatus(String signedStatus) {
+        this.signedStatus = signedStatus;
     }
 
     public Date getLastUpdatedDate() {
