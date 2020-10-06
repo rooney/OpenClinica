@@ -288,10 +288,11 @@ public class ValidateServiceImpl implements ValidateService {
 
     public boolean isUserHasAccessToStudy(List<StudyUserRoleBean> userRoles, String studyOid) {
         Study publicStudy = getPublicStudy(studyOid);
-
-        for (StudyUserRoleBean userRole : userRoles) {
-            if (publicStudy.getStudyId() == userRole.getStudyId()) {
-                return true;
+        if (publicStudy != null) {
+            for (StudyUserRoleBean userRole : userRoles) {
+                if (publicStudy.getStudyId() == userRole.getStudyId()) {
+                    return true;
+                }
             }
         }
         return false;
@@ -302,11 +303,13 @@ public class ValidateServiceImpl implements ValidateService {
 
     public boolean isUserHasAccessToSite(List<StudyUserRoleBean> userRoles, String siteOid) {
         Study publicSite = getPublicStudy(siteOid);
+        if (publicSite != null){
         for (StudyUserRoleBean userRole : userRoles) {
             if ((publicSite.getStudyId() == userRole.getStudyId()) || (publicSite.getStudy() != null ? publicSite.getStudy().getStudyId() == userRole.getStudyId() : false)) {
                 return true;
             }
         }
+    }
         return false;
     }
 

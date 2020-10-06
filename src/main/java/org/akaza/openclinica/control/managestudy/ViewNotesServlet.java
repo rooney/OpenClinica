@@ -2,6 +2,7 @@ package org.akaza.openclinica.control.managestudy;
 
 import core.org.akaza.openclinica.bean.core.DiscrepancyNoteType;
 import core.org.akaza.openclinica.bean.core.ResolutionStatus;
+import core.org.akaza.openclinica.bean.login.StudyUserRoleBean;
 import core.org.akaza.openclinica.bean.managestudy.CustomColumn;
 import core.org.akaza.openclinica.bean.managestudy.DiscrepancyNoteBean;
 import core.org.akaza.openclinica.bean.managestudy.StudySubjectBean;
@@ -13,6 +14,7 @@ import core.org.akaza.openclinica.dao.managestudy.StudyEventDefinitionDAO;
 import core.org.akaza.openclinica.dao.managestudy.StudySubjectDAO;
 import core.org.akaza.openclinica.dao.submit.EventCRFDAO;
 import core.org.akaza.openclinica.dao.submit.SubjectDAO;
+import core.org.akaza.openclinica.domain.datamap.Study;
 import core.org.akaza.openclinica.service.DiscrepancyNoteUtil;
 import core.org.akaza.openclinica.service.DiscrepancyNotesSummary;
 import core.org.akaza.openclinica.service.PermissionService;
@@ -77,7 +79,13 @@ public class ViewNotesServlet extends SecureController {
         String moduleStr = "manage";
         String study_oid = request.getParameter("study_oid");
         if (!StringUtils.isEmpty(study_oid)) {
-            changeStudy(study_oid);
+            if (getValidateService().isUserHasAccessToStudy(ub.getRoles(), study_oid.toUpperCase())
+                    || getValidateService().isUserHasAccessToSite(ub.getRoles(), study_oid.toUpperCase())) {
+                changeStudy(study_oid);
+            } else {
+                addPageMessage(respage.getString("no_permission_to_view_discrepancies"));
+                throw new InsufficientPermissionException(Page.MENU_SERVLET, resexception.getString("not_study_director_or_study_cordinator"), "1");
+            }
         }
         if (module != null && module.trim().length() > 0) {
             if ("submit".equals(module)) {
