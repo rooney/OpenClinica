@@ -346,14 +346,9 @@ public class OpenRosaSubmissionController {
             subjectContext = cache.getSubjectContext(ecid);
             UserAccount userAccount = getUserAccount(subjectContext);
 
-            String studySubjectOID = subjectContext.get("studySubjectOID");
-            int studyEventDefinitionID = Integer.valueOf(subjectContext.get("studyEventDefinitionID"));
-            StudyEventDefinition sed = studyEventDefinitionDao.findById(studyEventDefinitionID);
-            StudySubject studySubject = studySubjectDao.findByOcOID(studySubjectOID);
-
             int studyEventId = Integer.parseInt(subjectContext.get("studyEventID"));
             StudyEvent studyEvent = studyEventDao.findById(studyEventId);
-            updateStudyEventStatus(study,studySubject,sed,studyEvent,userAccount);                    
+            studyEvent.setWorkflowStatus(StudyEventWorkflowStatusEnum.DATA_ENTRY_STARTED);
 
             if (!formCacheService.resetExpiration(ecid)){
                 logger.info("Updating expiration failed, re-adding entry in expiration map for: " + ecid);
