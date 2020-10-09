@@ -270,56 +270,6 @@
                 <td class="table_header_column"><fmt:message key="OID" bundle="${resword}"/></td>
                 <td class="table_cell"><c:out value="${studySub.oid}"/></td>
             </tr>
-            <tr>
-                <td class="table_divider" colspan="2">&nbsp;</td>
-            </tr>
-
-            <tr>
-                <td class="table_header_column_top"><fmt:message key="person_ID" bundle="${resword}"/></td>
-                <td class="table_cell_top"><c:out value="${subject.uniqueIdentifier}"/></td>
-            </tr>
-            <c:choose>
-                <c:when test="${study.collectDob == '1'}">
-                    <tr>
-                        <td class="table_header_column_top"><fmt:message key="date_of_birth" bundle="${resword}"/></td>
-                        <td class="table_cell_top"><fmt:formatDate value="${subject.dateOfBirth}" pattern="${dteFormat}"/></td>
-                    </tr>
-                </c:when>
-                <c:when test="${study.collectDob == '3'}">
-                    <tr>
-                        <td class="table_header_column_top"><fmt:message key="date_of_birth" bundle="${resword}"/></td>
-                        <td class="table_cell_top"><fmt:message key="not_used" bundle="${resword}"/></td>
-                    </tr>
-                </c:when>
-                <c:otherwise>
-                    <tr>
-                        <td class="table_header_column_top"><fmt:message key="year_of_birth" bundle="${resword}"/></td>
-                        <td class="table_cell_top"><c:out value="${yearOfBirth}"/></td>
-                    </tr>
-                </c:otherwise>
-            </c:choose>
-            <tr>
-                <td class="table_header_column"><fmt:message key="gender" bundle="${resword}"/></td>
-                <td class="table_cell">
-                    <c:choose>
-                        <c:when test="${subject.gender==32}">
-                            &nbsp;
-                        </c:when>
-                        <c:when test="${subject.gender==109 ||subject.gender==77}">
-                            <fmt:message key="male" bundle="${resword}"/>
-                        </c:when>
-                        <c:otherwise>
-                            <fmt:message key="female" bundle="${resword}"/>
-                        </c:otherwise>
-                    </c:choose>
-
-                </td>
-            </tr>
-            <tr>
-                <td class="table_header_column"><fmt:message key="enrollment_date" bundle="${resword}"/></td>
-                <td class="table_cell_top"><fmt:formatDate value="${studySub.enrollmentDate}" pattern="${dteFormat}"/>&nbsp;</td>
-            </tr>
-
         </table>
 
         <!-- End Table Contents -->
@@ -857,13 +807,6 @@
 
         <table border="0" cellpadding="0" cellspacing="0" width="100%">
             <tr>
-                <td class="table_header_column_top"><fmt:message key="person_ID" bundle="${resword}"/></td>
-                <td class="table_cell_top"><c:out value="${subject.uniqueIdentifier}"/></td>
-            </tr>
-            <tr>
-                <td class="table_divider" colspan="2">&nbsp;</td>
-            </tr>
-            <tr>
                 <td class="table_header_column_top"><fmt:message key="date_record_created" bundle="${resword}"/></td>
                 <td class="table_cell_top"><fmt:formatDate value="${subject.createdDate}" pattern="${dteFormat}"/></td>
             </tr>
@@ -883,47 +826,6 @@
                 <td class="table_header_column"><fmt:message key="status" bundle="${resword}"/></td>
                 <td class="table_cell"><c:out value="${subject.status.name}"/></td>
             </tr>
-            <tr>
-                <td class="table_divider" colspan="2">&nbsp;</td>
-            </tr>
-            <c:choose>
-                <c:when test="${study.collectDob == '1'}">
-                    <tr>
-                        <td class="table_header_column_top"><fmt:message key="date_of_birth" bundle="${resword}"/></td>
-                        <td class="table_cell_top"><fmt:formatDate value="${subject.dateOfBirth}" pattern="${dteFormat}"/></td>
-                    </tr>
-                </c:when>
-                <c:when test="${study.collectDob == '3'}">
-                    <tr>
-                        <td class="table_header_column_top"><fmt:message key="date_of_birth" bundle="${resword}"/></td>
-                        <td class="table_cell_top">&nbsp;</td>
-                    </tr>
-                </c:when>
-                <c:otherwise>
-                    <tr>
-                        <td class="table_header_column_top"><fmt:message key="year_of_birth" bundle="${resword}"/></td>
-                        <td class="table_cell_top"><c:out value="${yearOfBirth}"/></td>
-                    </tr>
-                </c:otherwise>
-            </c:choose>
-            <tr>
-                <td class="table_header_column"><fmt:message key="gender" bundle="${resword}"/></td>
-                <td class="table_cell">
-                    <c:choose>
-                        <c:when test="${subject.gender==32}">
-                            &nbsp;
-                        </c:when>
-                        <c:when test="${subject.gender==109 ||subject.gender==77}">
-                            <fmt:message key="male" bundle="${resword}"/>
-                        </c:when>
-                        <c:otherwise>
-                            <fmt:message key="female" bundle="${resword}"/>
-                        </c:otherwise>
-                    </c:choose>
-
-                </td>
-            </tr>
-
         </table>
 
         <!-- End Table Contents -->
