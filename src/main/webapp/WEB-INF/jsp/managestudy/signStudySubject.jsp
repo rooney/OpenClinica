@@ -263,10 +263,6 @@
                 <td class="table_cell_top"><c:out value="${studySub.label}"/></td>
             </tr>
             <tr>
-                <td class="table_header_column"><fmt:message key="secondary_ID" bundle="${resword}"/></td>
-                <td class="table_cell"><c:out value="${studySub.secondaryLabel}"/></td>
-            </tr>
-            <tr>
                 <td class="table_header_column"><fmt:message key="OID" bundle="${resword}"/></td>
                 <td class="table_cell"><c:out value="${studySub.oid}"/></td>
             </tr>
