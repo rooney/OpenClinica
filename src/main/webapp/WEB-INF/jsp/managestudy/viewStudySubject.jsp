@@ -1959,6 +1959,7 @@
             $('#email-input-error').hide();
             $('#phone-input-error').hide();
             $('#invite_via_email input[value=' + participateInfo.inviteParticipant + ']').click();
+            $('#invite_via_sms input[value=false]').prop('checked', true);
             $('#reset-participant-access-code').prop('checked', false);
 
             enableDisableControls();
