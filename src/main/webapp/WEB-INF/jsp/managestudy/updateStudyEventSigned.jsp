@@ -227,7 +227,18 @@
                         </tr>
                         <tr>
                             <td class="table_header_column"><fmt:message key="subject_event_status" bundle="${resword}"/></td>
-                            <td class="table_cell"><c:out value="${studyEvent.workflowStatus.displayValue}"/></td>
+                            <td class="table_cell">
+                                <c:out value="${studyEvent.workflowStatus.displayValue}"/>
+                                <c:if test="${studyEvent.signed == true}">
+                                    &nbsp;<span class="icon icon-stamp-new status" alt="<fmt:message key="signed" bundle="${resword}"/>" title="<fmt:message key="signed" bundle="${resword}"/>"/>
+                                </c:if>
+                                <c:if test="${studyEvent.locked == true}">
+                                    &nbsp;<span class="icon icon-lock-new status" alt="<fmt:message key="locked" bundle="${resword}"/>" title="<fmt:message key="locked" bundle="${resword}"/>"/>
+                                </c:if>
+                                <c:if test="${studyEvent.archived == true}">
+                                    &nbsp;<span class="icon icon-archived-new status" alt="<fmt:message key="archived" bundle="${resword}"/>" title="<fmt:message key="archived" bundle="${resword}"/>"/>
+                                </c:if>
+                            </td>
                         </tr>
                         <tr>
                             <td class="table_header_column"><fmt:message key="last_updated_by" bundle="${resword}"/></td>
