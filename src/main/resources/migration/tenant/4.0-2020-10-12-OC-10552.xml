@@ -10,7 +10,14 @@
             <!--fixing restore study event trigger -->
         </preConditions>
         <sql splitStatements="false">
-            ALTER TABLE study_subject ADD CONSTRAINT study_subject_unique_label UNIQUE ("label");
+            DO $$
+            BEGIN
+            BEGIN
+                ALTER TABLE study_subject ADD CONSTRAINT study_subject_unique_label UNIQUE ("label");
+            EXCEPTION
+                WHEN duplicate_table THEN RAISE NOTICE 'Constraint study_subject_unique_label already exists';
+            END;
+            END $$;
         </sql>
     </changeSet>
 
