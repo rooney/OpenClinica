@@ -134,6 +134,7 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
         String studyEventRepeatKey;
         String itemDataValue;
         String itemDataXMLValue;
+        String startDate;
 
         ArrayList itemDataValues;
         String fileNm;
@@ -148,13 +149,11 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
          * each ite, like:
          *  ItemGroupOID--Item Name -- Item OID
          */
-        ArrayList mappedColumnNameList = null;
+        ArrayList mappedColumnNameList;
         /**
          * Hold all ItemGroupOIDs coming from mapping file
          */
         Object[] mappingItemGroupOIDs;
-
-        String mappingStr;
 
         try {
 
@@ -180,6 +179,7 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
             studyEventOID = (String) mappedValues.get("StudyEventOID");
             formOID = (String) mappedValues.get("FormOID");
             formVersion = (String) mappedValues.get("FormVersion");
+            startDate = (String) mappedValues.get("StartDate");
 
             // get default version
             if (formVersion == null || formVersion.trim().length() == 0) {
@@ -291,6 +291,8 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
 
                             Element studyEventData = document.createElement("StudyEventData");
                             studyEventData.setAttribute("StudyEventOID", studyEventOID);
+                            if (startDate != null && startDate != "")
+                                studyEventData.setAttribute("OpenClinica:StartDate", startDate);
 
                             Element formData = document.createElement("FormData");
                             formData.setAttribute("FormOID", formOID);
@@ -550,6 +552,8 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
                     //SkipMatchCriteria
                 } else if (key.equals("SkipMatchCriteria") || key.substring(1).equals("SkipMatchCriteria")) {
                     mappedValues.put("SkipMatchCriteria", val);
+                } else if (key.equals("StartDate") || key.substring(1).equals("StartDate")) {
+                    mappedValues.put("StartDate", val);
                 } else if (key != null && (key.trim().startsWith(PARTICIPANT_ID_HEADER_PROPERTY) || key.trim().indexOf(PARTICIPANT_ID_HEADER_PROPERTY) == 1)) {
                     mappedValues.put(PARTICIPANT_ID_HEADER_PROPERTY, val);
                 } else if (key != null && (key.trim().startsWith(DELIMITER_PROPERTY) || key.trim().indexOf(DELIMITER_PROPERTY) == 1)) {
@@ -801,6 +805,8 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
                         } else if (keyWord != null && keyWord.trim().startsWith("StudyEventOID") && value != null && value.trim().length() > 0) {
                             studyEventOIDValue = value.trim();
                             foundStudyEventOID = true;
+                        } else if (keyWord != null && keyWord.trim().startsWith("StartDate") && value != null && value.trim().length() > 0) {
+                            ; //do nothing
                         } else if (keyWord != null && (keyWord.trim().startsWith("SkipMatchCriteria") || keyWord.trim().indexOf("SkipMatchCriteria") == 1)) {
                             //check SkipMatchCriteria format
                             if (value != null && value.trim().length() > 0) {
@@ -815,8 +821,7 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
                                     }
                                 }
                             }
-
-                        } else if (keyWord != null && (keyWord.trim().startsWith(PARTICIPANT_ID_HEADER_PROPERTY) || keyWord.trim().indexOf("SkipMatchCriteria") == 1)) {
+                        }  else if (keyWord != null && (keyWord.trim().startsWith(PARTICIPANT_ID_HEADER_PROPERTY) || keyWord.trim().indexOf("SkipMatchCriteria") == 1)) {
                             // do nothing
                         } else if (keyWord != null && (keyWord.trim().startsWith(DELIMITER_PROPERTY) || keyWord.trim().indexOf("SkipMatchCriteria") == 1)) {
                             // do nothing
@@ -1113,7 +1118,7 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
             }
 
 
-            // check Form
+            // check 3: Form
             String formOid = formOIDValue;
             String formLayoutName = null;
             boolean needToCheckFormVersion = false;
@@ -1167,7 +1172,7 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
                 errors.add(eo);
             }
 
-            // check item group and Item OID
+            // check 4:item group and Item OID
             if (importItemGroupDTOs != null) {
                 for (ImportItemGroupDTO importItemGroupDTO : importItemGroupDTOs) {
                     String itemGroupOID = importItemGroupDTO.getItemGroupOID();

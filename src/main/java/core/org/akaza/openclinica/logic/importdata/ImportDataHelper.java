@@ -1,50 +1,10 @@
 package core.org.akaza.openclinica.logic.importdata;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Scanner;
-
-import javax.servlet.http.HttpServletRequest;
-
-import core.org.akaza.openclinica.bean.admin.CRFBean;
-import core.org.akaza.openclinica.bean.core.AuditableEntityBean;
-import core.org.akaza.openclinica.bean.core.EntityBean;
-import core.org.akaza.openclinica.bean.core.Status;
 import core.org.akaza.openclinica.bean.login.UserAccountBean;
-import core.org.akaza.openclinica.bean.managestudy.StudyEventBean;
-import core.org.akaza.openclinica.bean.managestudy.StudyEventDefinitionBean;
-import core.org.akaza.openclinica.bean.managestudy.StudySubjectBean;
-import core.org.akaza.openclinica.bean.submit.CRFVersionBean;
-import core.org.akaza.openclinica.bean.submit.EventCRFBean;
-import core.org.akaza.openclinica.bean.submit.FormLayoutBean;
-import core.org.akaza.openclinica.bean.submit.SubjectBean;
-
 import core.org.akaza.openclinica.core.SessionManager;
-import core.org.akaza.openclinica.dao.admin.CRFDAO;
 import core.org.akaza.openclinica.dao.core.CoreResources;
 import core.org.akaza.openclinica.dao.hibernate.StudyDao;
 import core.org.akaza.openclinica.dao.login.UserAccountDAO;
-import core.org.akaza.openclinica.dao.managestudy.StudyEventDAO;
-import core.org.akaza.openclinica.dao.managestudy.StudyEventDefinitionDAO;
-import core.org.akaza.openclinica.dao.managestudy.StudySubjectDAO;
-import core.org.akaza.openclinica.dao.submit.CRFVersionDAO;
-import core.org.akaza.openclinica.dao.submit.EventCRFDAO;
-import core.org.akaza.openclinica.dao.submit.FormLayoutDAO;
-import core.org.akaza.openclinica.dao.submit.SubjectDAO;
-import core.org.akaza.openclinica.domain.datamap.Study;
-import org.akaza.openclinica.domain.enumsupport.EventCrfWorkflowStatusEnum;
-import org.akaza.openclinica.domain.enumsupport.StudyEventWorkflowStatusEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,27 +12,32 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletRequest;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Scanner;
+
 /**
  * ImportDataHelper the entire focus of this piece of code is to generate the
  * necessary EventCRFBeans after uploading XML to the Database. Currently being
  * used by ImportCRFDataServlet. Created as part of refactoring efforts.
- * 
  * @author Tom Hickerson, 04/2008
- * @category logic classes
  */
 public class ImportDataHelper {
 
     protected final Logger logger = LoggerFactory.getLogger(getClass().getName());
     protected SessionManager sm;
     protected UserAccountBean ub;
-    
+
     static private String importFileDir;
     private String personalImportFileDir;
     private String currentUserName;
     private int currentActiveStudyId;
 
     @Autowired
-	private StudyDao studyDao;
+    private StudyDao studyDao;
 
     public void setSessionManager(SessionManager sm) {
         this.sm = sm;
@@ -81,627 +46,620 @@ public class ImportDataHelper {
     public void setUserAccountBean(UserAccountBean ub) {
         this.ub = ub;
     }
-    
+
     public String getImportFileDir(String studyOID) {
-		  if (importFileDir != null) {
-			  return importFileDir;
-		  }else {
-			  String dir = CoreResources.getField("filePath");
-	          if (!new File(dir).exists()) {
-	              logger.info("The filePath in datainfo.properties is invalid " + dir);             
-	          }
-	          // All the uploaded files will be saved in filePath/crf/original/
-	          String theDir = dir + "import" + File.separator + studyOID + File.separator + "original" + File.separator;
-	          if (!new File(theDir).isDirectory()) {
-	              new File(theDir).mkdirs();
-	              logger.info("Made the directory " + theDir);
-	          }
-	        
-	         importFileDir = theDir;
-		  }
-		 
-		return importFileDir;
-	}
-    
+        if (importFileDir != null) {
+            return importFileDir;
+        } else {
+            String dir = CoreResources.getField("filePath");
+            if (!new File(dir).exists()) {
+                logger.info("The filePath in datainfo.properties is invalid " + dir);
+            }
+            // All the uploaded files will be saved in filePath/crf/original/
+            String theDir = dir + "import" + File.separator + studyOID + File.separator + "original" + File.separator;
+            if (!new File(theDir).isDirectory()) {
+                new File(theDir).mkdirs();
+                logger.info("Made the directory " + theDir);
+            }
+
+            importFileDir = theDir;
+        }
+
+        return importFileDir;
+    }
+
     /**
-     * 
      * @param studyID
      * @param parentNm
      * @param fileNm
      * @return
      */
     public File getImportFileByStudyIDParentNm(String studyID, String parentNm, String fileNm) {
-	
-		  String dir = CoreResources.getField("filePath");
-          if (!new File(dir).exists()) {
-              logger.info("The filePath in datainfo.properties is invalid " + dir);             
-          }
-          // All the uploaded files will be saved in filePath/crf/original/
-          String theDir = dir + "import" + File.separator + studyID + File.separator + parentNm + File.separator;
-          if (!new File(theDir).isDirectory()) {
-              new File(theDir).mkdirs();
-              logger.info("Made the directory " + theDir);
-          }
-        
-        importFileDir = theDir;			 		  
-		File fileFolder = new File(importFileDir);
-	    	
-    	for (final File fileEntry : fileFolder.listFiles()) {
-    	      if (fileEntry.isDirectory()) {
-    	       ;
-    	      } else {
-    	        if (fileEntry.isFile()) {
-    	          String fileName = fileEntry.getName();
-    	          if (fileName.equals(fileNm)) {
-    	        	  return fileEntry;
-    	          }
-    	            
-    	        }
 
-    	      }
-    	    }
-    	
-    	return null;
-		
-	}
-    
+        String dir = CoreResources.getField("filePath");
+        if (!new File(dir).exists()) {
+            logger.info("The filePath in datainfo.properties is invalid " + dir);
+        }
+        // All the uploaded files will be saved in filePath/crf/original/
+        String theDir = dir + "import" + File.separator + studyID + File.separator + parentNm + File.separator;
+        if (!new File(theDir).isDirectory()) {
+            new File(theDir).mkdirs();
+            logger.info("Made the directory " + theDir);
+        }
+
+        importFileDir = theDir;
+        File fileFolder = new File(importFileDir);
+
+        for (final File fileEntry : fileFolder.listFiles()) {
+            if (fileEntry.isDirectory()) {
+                ;
+            } else {
+                if (fileEntry.isFile()) {
+                    String fileName = fileEntry.getName();
+                    if (fileName.equals(fileNm)) {
+                        return fileEntry;
+                    }
+
+                }
+
+            }
+        }
+
+        return null;
+
+    }
+
     public String getPersonalImportFileDir(HttpServletRequest request) {
-    	  String userName = "";
-    	  boolean prepareNewDir = false; 
-    	  UserAccountBean userBean = null;
-    	  int activeStudyId=-999;
-    	  
-		  if (personalImportFileDir != null) {
-			  // All the uploaded files will be saved in filePath/import/userName/
-	          userBean = this.getUserAccount(request);
+        String userName = "";
+        boolean prepareNewDir = false;
+        UserAccountBean userBean = null;
+        int activeStudyId = -999;
 
-	          if (userBean == null) {
-	                String err_msg = "errorCode.InvalidUser:"+ "Please send request as a valid user";	               
-	                return err_msg;
-	          }else {	        	  
-	        	  userName = userBean.getName();
-	        	  activeStudyId = userBean.getActiveStudyId();
-	        	  
-	        	  if(this.getCurrentUserName().equals(userName) && this.getCurrentActiveStudyId()==activeStudyId) {
-	        		  return personalImportFileDir;
-	        	  }else {
-	        		  prepareNewDir = true;	        		  
-	        	  }
-	          }	  
-			  
-		  }else {
-			  prepareNewDir = true;  
-		  }	 
-		  
-		  if(prepareNewDir) {
-			  String dir = CoreResources.getField("filePath");
-	          if (!new File(dir).exists()) {
-	              logger.info("The filePath in datainfo.properties is invalid " + dir);             
-	          }
-	          // All the uploaded files will be saved in filePath/import/userName/
-	          userBean = this.getUserAccount(request);
+        if (personalImportFileDir != null) {
+            // All the uploaded files will be saved in filePath/import/userName/
+            userBean = this.getUserAccount(request);
 
-	          if (userBean == null) {
-	                String err_msg = "errorCode.InvalidUser:"+ "Please send request as a valid user";	               
-	                return err_msg;
-	          }else {	        	 
-	        	  userName = (userBean.getName()+"_" +userBean.getId()).toLowerCase().replace(" ","");
-	        	  activeStudyId = userBean.getActiveStudyId();
-	        	  
-	        	  this.setCurrentUserName(userName);
-	        	  this.setCurrentActiveStudyId(activeStudyId);
-	          }
-	          
-	          
-	          String theDir = dir + "import" + File.separator + activeStudyId+ File.separator + userName + File.separator;
-          	         
-	          if (!new File(theDir).isDirectory()) {
-	              new File(theDir).mkdirs();
-	              logger.info("Made the directory " + theDir);
-	          }
-	        
-	          personalImportFileDir = theDir;
-		  }
-		 
-		return personalImportFileDir;
-	}
-   
-   
-    public void deleteTempImportFile(File file,String studyOID) {
-    	String fileName = file.getName();
-    	String importFileDir = this.getImportFileDir(studyOID);
-    	
-    	File tempFile = new File(importFileDir + fileName);
-    	
-    	if(tempFile.exists()) {
-    		tempFile.delete();
-    	}
+            if (userBean == null) {
+                String err_msg = "errorCode.InvalidUser:" + "Please send request as a valid user";
+                return err_msg;
+            } else {
+                userName = userBean.getName();
+                activeStudyId = userBean.getActiveStudyId();
+
+                if (this.getCurrentUserName().equals(userName) && this.getCurrentActiveStudyId() == activeStudyId) {
+                    return personalImportFileDir;
+                } else {
+                    prepareNewDir = true;
+                }
+            }
+
+        } else {
+            prepareNewDir = true;
+        }
+
+        if (prepareNewDir) {
+            String dir = CoreResources.getField("filePath");
+            if (!new File(dir).exists()) {
+                logger.info("The filePath in datainfo.properties is invalid " + dir);
+            }
+            // All the uploaded files will be saved in filePath/import/userName/
+            userBean = this.getUserAccount(request);
+
+            if (userBean == null) {
+                String err_msg = "errorCode.InvalidUser:" + "Please send request as a valid user";
+                return err_msg;
+            } else {
+                userName = (userBean.getName() + "_" + userBean.getId()).toLowerCase().replace(" ", "");
+                activeStudyId = userBean.getActiveStudyId();
+
+                this.setCurrentUserName(userName);
+                this.setCurrentActiveStudyId(activeStudyId);
+            }
+
+
+            String theDir = dir + "import" + File.separator + activeStudyId + File.separator + userName + File.separator;
+
+            if (!new File(theDir).isDirectory()) {
+                new File(theDir).mkdirs();
+                logger.info("Made the directory " + theDir);
+            }
+
+            personalImportFileDir = theDir;
+        }
+
+        return personalImportFileDir;
     }
-    
-    public void deletePersonalTempImportFile(String fileName,HttpServletRequest request) {
-    	
-    	String importFileDir = this.getPersonalImportFileDir(request);
-    	
-    	File tempFile = new File(importFileDir + fileName);
-    	
-    	if(tempFile.exists()) {
-    		tempFile.delete();
-    	}
-    }
-    
-    public ArrayList<File> splitDataFileAndProcesDataRowbyRow(File file,HttpServletRequest request) {
-		ArrayList<File> fileList = new ArrayList<>();
-	    BufferedReader reader;
-	    
-	    try {
-            int count =1;	    	
-	    		    	
-	    	File splitFile;
-	    	String importFileDir = this.getPersonalImportFileDir(request);
-	    	
-	    	reader = new BufferedReader(new FileReader(file));
-	    	
-	    	String orginalFileName = file.getName();
-	    	int pos = orginalFileName.indexOf(".");
-	    	orginalFileName = orginalFileName.substring(0,pos);
-	    	
-	    	String columnLine = reader.readLine();
-	    	String line = columnLine;	    
-	    	
-	    	while (line != null) {
-				//System.out.println(line);
-				// read next line
-				line = reader.readLine();
-				
-				splitFile = new File(importFileDir + orginalFileName +"_"+ count + ".txt");				
-				FileOutputStream fos = new FileOutputStream(splitFile);			 
-				BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
-			 
-				bw.write(columnLine);				
-				bw.write("\n");
-				if(line != null) {
-					bw.write(line);	
-					fileList.add(splitFile);
-				}
-				
-			 
-				bw.close();
-							
-				count++;
-				
-			}
-			reader.close();
-	        
-	       
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
-	    
-		return fileList;
-	}
-	
-	/**
-	 * 
-	 * @param files
-	 * @throws Exception
-	 */
-	public void saveFileToImportFolder(List<File> files,String studyOID) throws Exception {
 
-  		
-	  	File uplodedFile;
-	  	String 	orginalFileName;
-	  	BufferedReader reader;
-	  	String line;
-	  	String importFileDir = this.getImportFileDir(studyOID);
-	  	
- 		for (File file : files) {
- 			reader = new BufferedReader(new FileReader(file));
-	    	
- 			orginalFileName = file.getName();
- 			uplodedFile = new File(importFileDir + orginalFileName);				
-			FileOutputStream fos = new FileOutputStream(uplodedFile);			 
-			BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
-		 
-			line = reader.readLine();
-			while(line != null) {
-				bw.write(line);
-				bw.write("\r");
-				line = reader.readLine();
-			}
-			
-		 
-			bw.close();
-						
- 	 	 	 		
- 				
- 				
- 		}
-  
-  }
-	
+
+    public void deleteTempImportFile(File file, String studyOID) {
+        String fileName = file.getName();
+        String importFileDir = this.getImportFileDir(studyOID);
+
+        File tempFile = new File(importFileDir + fileName);
+
+        if (tempFile.exists()) {
+            tempFile.delete();
+        }
+    }
+
+    public void deletePersonalTempImportFile(String fileName, HttpServletRequest request) {
+
+        String importFileDir = this.getPersonalImportFileDir(request);
+
+        File tempFile = new File(importFileDir + fileName);
+
+        if (tempFile.exists()) {
+            tempFile.delete();
+        }
+    }
+
+    public ArrayList<File> splitDataFileAndProcesDataRowbyRow(File file, HttpServletRequest request) {
+        ArrayList<File> fileList = new ArrayList<>();
+        BufferedReader reader;
+
+        try {
+            int count = 1;
+
+            File splitFile;
+            String importFileDir = this.getPersonalImportFileDir(request);
+
+            reader = new BufferedReader(new FileReader(file));
+
+            String orginalFileName = file.getName();
+            int pos = orginalFileName.indexOf(".");
+            orginalFileName = orginalFileName.substring(0, pos);
+
+            String columnLine = reader.readLine();
+            String line = columnLine;
+
+            while (line != null) {
+                //System.out.println(line);
+                // read next line
+                line = reader.readLine();
+
+                splitFile = new File(importFileDir + orginalFileName + "_" + count + ".txt");
+                FileOutputStream fos = new FileOutputStream(splitFile);
+                BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
+
+                bw.write(columnLine);
+                bw.write("\n");
+                if (line != null) {
+                    bw.write(line);
+                    fileList.add(splitFile);
+                }
+
+
+                bw.close();
+
+                count++;
+
+            }
+            reader.close();
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return fileList;
+    }
+
     /**
-     * 
+     * @param files
+     * @throws Exception
+     */
+    public void saveFileToImportFolder(List<File> files, String studyOID) throws Exception {
+
+
+        File uplodedFile;
+        String orginalFileName;
+        BufferedReader reader;
+        String line;
+        String importFileDir = this.getImportFileDir(studyOID);
+
+        for (File file : files) {
+            reader = new BufferedReader(new FileReader(file));
+
+            orginalFileName = file.getName();
+            uplodedFile = new File(importFileDir + orginalFileName);
+            FileOutputStream fos = new FileOutputStream(uplodedFile);
+            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
+
+            line = reader.readLine();
+            while (line != null) {
+                bw.write(line);
+                bw.write("\r");
+                line = reader.readLine();
+            }
+
+
+            bw.close();
+
+
+        }
+
+    }
+
+    /**
      * @param orginalFileName
      * @param msg
      */
-    public void writeToMatchAndSkipLog(String orginalFileName, String msg,HttpServletRequest request) {
-		
-    	BufferedWriter bw = null;
-		FileWriter fw = null;
-		boolean isNewFile = false;
+    public void writeToMatchAndSkipLog(String orginalFileName, String msg, HttpServletRequest request) {
 
-	    String logFileName;
-	    // OC-10156
-	    if(orginalFileName == null) {
-	    	;
-	    }else {
-	    	 try {
-              		 	    	
-	            String recordNum =  msg.substring(0,msg.indexOf(","));
-	 	    	File logFile;
-	 	    	String importFileDir = this.getPersonalImportFileDir(request);
-	     	    
-	 	    	//get logFileName
-	 	    	logFileName = (String) request.getAttribute("logFileName");
-	 	    	logFileName = importFileDir + logFileName;
-	 			logFile = new File(logFileName);
-	 			
-	 			/**
-	 			 *  create new file and add first line
-	 			 *  RowNo , ParticipantID , Status , Message
-	 			 */
-	 			if(!logFile.exists()) {
-	 				logFile.createNewFile();
-	 				isNewFile = true;				
-	 			}
-	 			
-	 			// true = append file
-	 			fw = new FileWriter(logFile.getAbsoluteFile(), true);
-	 			bw = new BufferedWriter(fw);
-	             
-	 			if(isNewFile || recordNum.equals("1")) {	 			
-	 				bw.write("Row Number,Participant ID,Status,Message");
-	 				bw.write("\n");
-	 			}
-	 			
-	 			if(msg != null) {
-	 				bw.write(msg);	
-	 				bw.write("\n");
-	 			}	
-	 			
-	 			bw.close();						
-	 	       
-	 	    } catch (Exception e) {
-	 	    	logger.error("Exception occurred", e);
-	 	    }finally {
-	 			try {
-	 				if (bw != null)
-	 					bw.close();
-	 				if (fw != null)
-	 					fw.close();
-	 			} catch (IOException ex) {
-	 				logger.error("Exception occurred", ex);
-	 			}
-	 		}
-	    }
-	}
+        BufferedWriter bw = null;
+        FileWriter fw = null;
+        boolean isNewFile = false;
 
-	public void addSummaryAndMappingFileInLog(String logFileName, File mappingFile, HttpServletRequest request, int totalDataRowsCount){
-		BufferedWriter bw = null;
-		FileWriter fw = null;
-		String dataFileName = (String) request.getAttribute("dataFileName");
-		String startTimestamp = (String) request.getAttribute("startTimestamp");
-    	try {
-			File logFile;
-			String importFileDir = this.getPersonalImportFileDir(request);
-			int successfulImportCount = 0;
-			int failedImportCount = 0;
-			int skippedImportCount = 0;
+        String logFileName;
+        // OC-10156
+        if (orginalFileName == null) {
+            ;
+        } else {
+            try {
 
-			logFileName = importFileDir + logFileName;
-			logFile = new File(logFileName);
+                String recordNum = msg.substring(0, msg.indexOf(","));
+                File logFile;
+                String importFileDir = this.getPersonalImportFileDir(request);
 
-			if(logFile.exists()) {
-				try(Scanner sc = new Scanner(logFile)){
-					String currentLine;
+                //get logFileName
+                logFileName = (String) request.getAttribute("logFileName");
+                //for mock request
+                if (logFileName == null) {
+                    logFileName = request.getHeader("logFileName");
+                }
+                logFileName = importFileDir + logFileName;
+                logFile = new File(logFileName);
 
-					while (sc.hasNextLine()) {
-						currentLine = sc.nextLine();
-						if(currentLine.startsWith("Row"))
-							continue;
-						if(currentLine.contains("SUCCESS"))
-							if(currentLine.contains("Skip"))
-								skippedImportCount++;
-							else
-								successfulImportCount++;
-						else if(currentLine.contains("FAILED"))
-							failedImportCount++;
-					}
+                /**
+                 *  create new file and add first line
+                 *  RowNo , ParticipantID , Status , Message
+                 */
+                if (!logFile.exists()) {
+                    logFile.createNewFile();
+                    isNewFile = true;
+                }
 
-				}
-				if(failedImportCount != (totalDataRowsCount - successfulImportCount - skippedImportCount))
-				{
-					logger.error("Some logs for data imported is not available");
-					failedImportCount = totalDataRowsCount - successfulImportCount - skippedImportCount;
-				}
-				fw = new FileWriter(logFile.getAbsoluteFile(), true);
-				bw = new BufferedWriter(fw);
-				bw.write("\n");
-				bw.write("# Import Summary\n");
-				bw.write("Rows Imported (new records)=" + successfulImportCount+"\n");
-				bw.write("Rows Skipped=" + skippedImportCount+"\n");
-				bw.write("Rows Failed=" + failedImportCount+"\n");
-				bw.write("Total Rows=" + totalDataRowsCount +"\n\n");
-				if(dataFileName != null)
-					bw.write("Import Data File=" + dataFileName+"\n");
-				if(startTimestamp != null)
-					bw.write("Import Date=" + startTimestamp+"\n\n");
-				if(mappingFile != null){
-					bw.write("# Import Mapping File\n\n");
-					bw.write(getMappingFileValues(mappingFile));
-				}
-			}
-		} catch (Exception e) {
-			logger.error("Exception occurred", e);
-		}finally {
-			try {
-				if (bw != null)
-					bw.close();
-				if (fw != null)
-					fw.close();
-			} catch (IOException ex) {
-				logger.error("Exception occurred", ex);
-			}
-		}
+                // true = append file
+                fw = new FileWriter(logFile.getAbsoluteFile(), true);
+                bw = new BufferedWriter(fw);
 
-	}
+                if (isNewFile || recordNum.equals("1")) {
+                    bw.write("Row Number,Participant ID,Status,Message");
+                    bw.write("\n");
+                }
 
-	public String getMappingFileValues(File mappingFile) throws IOException {
-		StringBuilder mappingFileSb  = new StringBuilder();
+                if (msg != null) {
+                    bw.write(msg);
+                    bw.write("\n");
+                }
 
-		try(Scanner sc = new Scanner(mappingFile)){
-			while (sc.hasNextLine()) {
-				mappingFileSb.append(sc.nextLine()+"\n");
-			}
+                bw.close();
 
-		}
-		return mappingFileSb.toString();
-	}
-
-	/**
-     * 
-     * @param request
-     * @return
-     */
-    public boolean hasDMrole(HttpServletRequest request) {			
-	 UserAccountBean userBean = this.getUserAccount(request);
-	 
-	 String activeStudyRoleName = userBean.getActiveStudyRoleName();
-	 
-	 if(activeStudyRoleName != null && activeStudyRoleName.toLowerCase().equals("coordinator")) {
-		 return true;
-	 }else{
-		 return false;
-	 }
-	
-		
+            } catch (Exception e) {
+                logger.error("Exception occurred", e);
+            } finally {
+                try {
+                    if (bw != null)
+                        bw.close();
+                    if (fw != null)
+                        fw.close();
+                } catch (IOException ex) {
+                    logger.error("Exception occurred", ex);
+                }
+            }
+        }
     }
-    
+
+    public void addSummaryAndMappingFileInLog(String logFileName, File mappingFile, HttpServletRequest request, int totalDataRowsCount) {
+        BufferedWriter bw = null;
+        FileWriter fw = null;
+        String dataFileName = (String) request.getAttribute("dataFileName");
+        String startTimestamp = (String) request.getAttribute("startTimestamp");
+        try {
+            File logFile;
+            String importFileDir = this.getPersonalImportFileDir(request);
+            int successfulImportCount = 0;
+            int failedImportCount = 0;
+            int skippedImportCount = 0;
+
+            logFileName = importFileDir + logFileName;
+            logFile = new File(logFileName);
+
+            if (logFile.exists()) {
+                try (Scanner sc = new Scanner(logFile)) {
+                    String currentLine;
+
+                    while (sc.hasNextLine()) {
+                        currentLine = sc.nextLine();
+                        if (currentLine.startsWith("Row"))
+                            continue;
+                        if (currentLine.contains("SUCCESS"))
+                            if (currentLine.contains("Skip"))
+                                skippedImportCount++;
+                            else
+                                successfulImportCount++;
+                        else if (currentLine.contains("FAILED"))
+                            failedImportCount++;
+                    }
+
+                }
+                if (failedImportCount != (totalDataRowsCount - successfulImportCount - skippedImportCount)) {
+                    logger.error("Some logs for data imported is not available");
+                    failedImportCount = totalDataRowsCount - successfulImportCount - skippedImportCount;
+                }
+                fw = new FileWriter(logFile.getAbsoluteFile(), true);
+                bw = new BufferedWriter(fw);
+                bw.write("\n");
+                bw.write("# Import Summary\n");
+                bw.write("Rows Imported (new records)=" + successfulImportCount + "\n");
+                bw.write("Rows Skipped=" + skippedImportCount + "\n");
+                bw.write("Rows Failed=" + failedImportCount + "\n");
+                bw.write("Total Rows=" + totalDataRowsCount + "\n\n");
+                if (dataFileName != null)
+                    bw.write("Import Data File=" + dataFileName + "\n");
+                if (startTimestamp != null)
+                    bw.write("Import Date=" + startTimestamp + "\n\n");
+                if (mappingFile != null) {
+                    bw.write("# Import Mapping File\n\n");
+                    bw.write(getMappingFileValues(mappingFile));
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Exception occurred", e);
+        } finally {
+            try {
+                if (bw != null)
+                    bw.close();
+                if (fw != null)
+                    fw.close();
+            } catch (IOException ex) {
+                logger.error("Exception occurred", ex);
+            }
+        }
+
+    }
+
+    public String getMappingFileValues(File mappingFile) throws IOException {
+        StringBuilder mappingFileSb = new StringBuilder();
+
+        try (Scanner sc = new Scanner(mappingFile)) {
+            while (sc.hasNextLine()) {
+                mappingFileSb.append(sc.nextLine() + "\n");
+            }
+
+        }
+        return mappingFileSb.toString();
+    }
+
     /**
-     * 
      * @param request
      * @return
      */
-    public ArrayList<File> getPersonalImportLogFile(HttpServletRequest request,File fileDir) {
-    
-    	ArrayList<File> fileList = new ArrayList<>();
-    	String importFileDir = null;
-    	File fileFolder = null;
-    	
-    	if(fileDir != null) {
-    		fileFolder = fileDir;
-    	}else {
-    		
-    		importFileDir = this.getPersonalImportFileDir(request);
-	    	 // check user role
-	    	if(this.hasDMrole(request)) {
-	    		//C:\tools\apache-tomcat-7.0.82/openclinica.data/import\31\root_1\	    		
-	    		if(importFileDir.indexOf("\\") > -1) {
-	    			 if(importFileDir.endsWith("\\")) {
-		            	 int endIndex = importFileDir.lastIndexOf("\\");	    		
-		         		importFileDir = importFileDir.substring(0, endIndex);
-		         		// 2nd time
-		         		endIndex = importFileDir.lastIndexOf("\\");	    		
-		         		importFileDir = importFileDir.substring(0, endIndex);
-		            }else {
-		            	 int endIndex = importFileDir.lastIndexOf("\\");	    		
-			         	 importFileDir = importFileDir.substring(0, endIndex);
-		            }
-	    		}else {
-	    			// LINUX:  /opt/tomcat/openclinica.data/import/2171/customcrc_351/
-		    		if(importFileDir.indexOf("/") > -1) {
-		    			 if(importFileDir.endsWith("/")) {
-			            	 int endIndex = importFileDir.lastIndexOf("/");	    		
-			         		importFileDir = importFileDir.substring(0, endIndex);
-			         		// 2nd time
-			         		endIndex = importFileDir.lastIndexOf("/");	    		
-			         		importFileDir = importFileDir.substring(0, endIndex);
-			            }else {
-			            	 int endIndex = importFileDir.lastIndexOf("/");	    		
-				         	 importFileDir = importFileDir.substring(0, endIndex);
-			            }
-		    		}
-	    		}
-	    		
-	    		
-	    	}
-	    	
-	    	fileFolder = new File(importFileDir);
-    	}
-    	
-    	// recursive call
-    	for (final File fileEntry : fileFolder.listFiles()) {
-    	      if (fileEntry.isDirectory()) {
-    	    	  ArrayList<File> fileListFromSubDir = getPersonalImportLogFile(null,fileEntry);
-    	    	  if(fileListFromSubDir!=null && fileListFromSubDir.size() > 0) {
-    	    		  fileList.addAll(fileListFromSubDir);
-    	    	  }
-    	    	  
-    	      } else {
-    	        if (fileEntry.isFile()) {
-    	          String fileName = fileEntry.getName();
-    	          if (fileName.endsWith("_log.csv")) {
-    	        	  fileList.add(fileEntry);
-    	          }
-    	            
-    	        }
+    public boolean hasDMrole(HttpServletRequest request) {
+        UserAccountBean userBean = this.getUserAccount(request);
 
-    	      }
-    	    }
-    	
-    	fileList.sort(new LogFileSorter());
-    	return fileList;
-    }
-    
-    public File getPersonalImportLogFile(String fileNm,HttpServletRequest request) {
-        
-    	String importFileDir = this.getPersonalImportFileDir(request);    	
-    	File fileFolder = new File(importFileDir);
-    	
-    	for (final File fileEntry : fileFolder.listFiles()) {
-    	      if (fileEntry.isDirectory()) {
-    	       ;
-    	      } else {
-    	        if (fileEntry.isFile()) {
-    	          String fileName = fileEntry.getName();
-    	          if (fileName.equals(fileNm)) {
-    	        	  return fileEntry;
-    	          }
-    	            
-    	        }
+        String activeStudyRoleName = userBean.getActiveStudyRoleName();
 
-    	      }
-    	    }
-    	
-    	return null;
+        if (activeStudyRoleName != null && activeStudyRoleName.toLowerCase().equals("coordinator")) {
+            return true;
+        } else {
+            return false;
+        }
+
+
     }
+
+    /**
+     * @param request
+     * @return
+     */
+    public ArrayList<File> getPersonalImportLogFile(HttpServletRequest request, File fileDir) {
+
+        ArrayList<File> fileList = new ArrayList<>();
+        String importFileDir = null;
+        File fileFolder = null;
+
+        if (fileDir != null) {
+            fileFolder = fileDir;
+        } else {
+
+            importFileDir = this.getPersonalImportFileDir(request);
+            // check user role
+            if (this.hasDMrole(request)) {
+                //C:\tools\apache-tomcat-7.0.82/openclinica.data/import\31\root_1\
+                if (importFileDir.indexOf("\\") > -1) {
+                    if (importFileDir.endsWith("\\")) {
+                        int endIndex = importFileDir.lastIndexOf("\\");
+                        importFileDir = importFileDir.substring(0, endIndex);
+                        // 2nd time
+                        endIndex = importFileDir.lastIndexOf("\\");
+                        importFileDir = importFileDir.substring(0, endIndex);
+                    } else {
+                        int endIndex = importFileDir.lastIndexOf("\\");
+                        importFileDir = importFileDir.substring(0, endIndex);
+                    }
+                } else {
+                    // LINUX:  /opt/tomcat/openclinica.data/import/2171/customcrc_351/
+                    if (importFileDir.indexOf("/") > -1) {
+                        if (importFileDir.endsWith("/")) {
+                            int endIndex = importFileDir.lastIndexOf("/");
+                            importFileDir = importFileDir.substring(0, endIndex);
+                            // 2nd time
+                            endIndex = importFileDir.lastIndexOf("/");
+                            importFileDir = importFileDir.substring(0, endIndex);
+                        } else {
+                            int endIndex = importFileDir.lastIndexOf("/");
+                            importFileDir = importFileDir.substring(0, endIndex);
+                        }
+                    }
+                }
+
+
+            }
+
+            fileFolder = new File(importFileDir);
+        }
+
+        // recursive call
+        for (final File fileEntry : fileFolder.listFiles()) {
+            if (fileEntry.isDirectory()) {
+                ArrayList<File> fileListFromSubDir = getPersonalImportLogFile(null, fileEntry);
+                if (fileListFromSubDir != null && fileListFromSubDir.size() > 0) {
+                    fileList.addAll(fileListFromSubDir);
+                }
+
+            } else {
+                if (fileEntry.isFile()) {
+                    String fileName = fileEntry.getName();
+                    if (fileName.endsWith("_log.csv")) {
+                        fileList.add(fileEntry);
+                    }
+
+                }
+
+            }
+        }
+
+        fileList.sort(new LogFileSorter());
+        return fileList;
+    }
+
+    public File getPersonalImportLogFile(String fileNm, HttpServletRequest request) {
+
+        String importFileDir = this.getPersonalImportFileDir(request);
+        File fileFolder = new File(importFileDir);
+
+        for (final File fileEntry : fileFolder.listFiles()) {
+            if (fileEntry.isDirectory()) {
+                ;
+            } else {
+                if (fileEntry.isFile()) {
+                    String fileName = fileEntry.getName();
+                    if (fileName.equals(fileNm)) {
+                        return fileEntry;
+                    }
+
+                }
+
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Helper Method to get the user account
-     * 
      * @return UserAccountBean
      */
     public UserAccountBean getUserAccount(HttpServletRequest request) {
-    	UserAccountBean userBean;    
-    	
-    	if(request.getSession().getAttribute("userBean") != null) {
-    		userBean = (UserAccountBean) request.getSession().getAttribute("userBean");
-    		
-    	}else {
-    		 Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-    	        String username = null;
-    	        if (principal instanceof UserDetails) {
-    	            username = ((UserDetails) principal).getUsername();
-    	        } else {
-    	            username = principal.toString();
-    	        }
-    	        UserAccountDAO userAccountDao = new UserAccountDAO(sm.getDataSource());
-    	        userBean = (UserAccountBean) userAccountDao.findByUserName(username);
-    	}
-    	
-    	return userBean;
-       
-	}
-    
-    public File[] convert(MultipartFile[] files,String studyOID)
-    {    
-        int size =  files.length;
-        
-        File[]  fileArray = new File[size];
-        
+        UserAccountBean userBean;
+
+        if (request.getSession().getAttribute("userBean") != null) {
+            userBean = (UserAccountBean) request.getSession().getAttribute("userBean");
+
+        } else {
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            String username = null;
+            if (principal instanceof UserDetails) {
+                username = ((UserDetails) principal).getUsername();
+            } else {
+                username = principal.toString();
+            }
+            UserAccountDAO userAccountDao = new UserAccountDAO(sm.getDataSource());
+            userBean = (UserAccountBean) userAccountDao.findByUserName(username);
+        }
+
+        return userBean;
+
+    }
+
+    public File[] convert(MultipartFile[] files, String studyOID) {
+        int size = files.length;
+
+        File[] fileArray = new File[size];
+
         int i = 0;
-        for(MultipartFile file :files) {
-        	File convFile = new File(this.getImportFileDir(studyOID) + file.getOriginalFilename());
+        for (MultipartFile file : files) {
+            File convFile = new File(this.getImportFileDir(studyOID) + file.getOriginalFilename());
             try {
-				convFile.createNewFile();
-				FileOutputStream fos = new FileOutputStream(convFile); 
-	            fos.write(file.getBytes());
-	            fos.close(); 
-	            fileArray[i]= convFile;
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} 
-           
+                convFile.createNewFile();
+                FileOutputStream fos = new FileOutputStream(convFile);
+                fos.write(file.getBytes());
+                fos.close();
+                fileArray[i] = convFile;
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
             i++;
         }
-    	
-        
+
+
         return fileArray;
-    }  
-    
-    
-   /**
-    * 
-    * @param dataStr
-    * @param orginalFileName
-    * @return
-    */
-    public File saveDataToFile(String  dataStr,String orginalFileName,String studyOID) {
-		
-    	File dataFile = null;
-    	
-	    try {	    		    	
-	    	String importFileDir = this.getImportFileDir(studyOID);	    	
-	    	
-	    	int pos = orginalFileName.indexOf(".");
-	    	orginalFileName = orginalFileName.substring(0,pos);	    	
-	    
-	    	BufferedWriter bw = null;
-	    	FileOutputStream fos = null;		
-				
-			if(dataStr != null) {
-				dataFile = new File(importFileDir + orginalFileName + ".xml");				
-				fos = new FileOutputStream(dataFile);			 
-				bw = new BufferedWriter(new OutputStreamWriter(fos));
-			 
-				bw.write(dataStr);				
-				
-			}
-			
-		    if(bw !=null) {
-		    	bw.close();
-		    }
-				    
-	       
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
-	    
-		return dataFile;
-	}
-
-public String getCurrentUserName() {
-	return currentUserName;
-}
-
-public void setCurrentUserName(String currentUserName) {
-	this.currentUserName = currentUserName;
-}
-
-public int getCurrentActiveStudyId() {
-	return currentActiveStudyId;
-}
-
-public void setCurrentActiveStudyId(int currentActiveStudyId) {
-	this.currentActiveStudyId = currentActiveStudyId;
-}
-
-class LogFileSorter implements Comparator<File> 
-{
-    @Override
-    public int compare(File f1, File f2) {
-        return Long.compare(f2.lastModified(), f1.lastModified());
     }
-}
 
-   }
+
+    /**
+     * @param dataStr
+     * @param orginalFileName
+     * @return
+     */
+    public File saveDataToFile(String dataStr, String orginalFileName, String studyOID) {
+
+        File dataFile = null;
+
+        try {
+            String importFileDir = this.getImportFileDir(studyOID);
+
+            int pos = orginalFileName.indexOf(".");
+            orginalFileName = orginalFileName.substring(0, pos);
+
+            BufferedWriter bw = null;
+            FileOutputStream fos = null;
+
+            if (dataStr != null) {
+                dataFile = new File(importFileDir + orginalFileName + ".xml");
+                fos = new FileOutputStream(dataFile);
+                bw = new BufferedWriter(new OutputStreamWriter(fos));
+
+                bw.write(dataStr);
+
+            }
+
+            if (bw != null) {
+                bw.close();
+            }
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return dataFile;
+    }
+
+    public String getCurrentUserName() {
+        return currentUserName;
+    }
+
+    public void setCurrentUserName(String currentUserName) {
+        this.currentUserName = currentUserName;
+    }
+
+    public int getCurrentActiveStudyId() {
+        return currentActiveStudyId;
+    }
+
+    public void setCurrentActiveStudyId(int currentActiveStudyId) {
+        this.currentActiveStudyId = currentActiveStudyId;
+    }
+
+    class LogFileSorter implements Comparator<File> {
+        @Override
+        public int compare(File f1, File f2) {
+            return Long.compare(f2.lastModified(), f1.lastModified());
+        }
+    }
+
+}

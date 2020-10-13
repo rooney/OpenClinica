@@ -286,7 +286,7 @@ public class RestfulServiceHelper {
      */
     public ImportCRFInfoSummary sendOneDataRowPerRequestByHttpClient(List<File> files, HttpServletRequest request, HashMap hm) throws Exception {
         String remoteAddress = this.getBasePath(request);
-        String importDataWSUrl = remoteAddress + "/OpenClinica/pages/auth/api/clinicaldata/";
+        String importDataWSUrl = remoteAddress + "/OpenClinica/pages/auth/api/clinicaldata/import";
         ImportCRFInfoSummary importCRFInfoSummary = new ImportCRFInfoSummary();
         ArrayList<File> tempODMFileList = new ArrayList<>();
         String studyOID = null;
@@ -295,12 +295,10 @@ public class RestfulServiceHelper {
          *  prepare mapping file
          */
         File mappingFile = null;
-        String mappingpartNm = null;
         for (File file : files) {
 
             if (file.getName().toLowerCase().endsWith(".properties")) {
                 mappingFile = file;
-                mappingpartNm = "uploadedData";
                 studyOID = this.getImportDataHelper().getStudyOidFromMappingFile(file);
                 Study publicStudy = null;
                 if (StringUtils.isEmpty(studyOID))
@@ -313,8 +311,7 @@ public class RestfulServiceHelper {
         }
 
         // prepare log file
-        String logFileName = null;
-        logFileName = (String) request.getAttribute("logFileName");
+//        String logFileName = (String) request.getAttribute("logFileName");
 
         int i = 1;
         for (File file : files) {
@@ -322,7 +319,7 @@ public class RestfulServiceHelper {
             if (file.getName().toLowerCase().endsWith(".properties")) {
             } else {
                 ArrayList<File> dataFileList = splitDataFileAndProcesDataRowbyRow(mappingFile, file, studyOID);
-                setDataFileNameAndTimeStampForLog(request, file);
+//                setDataFileNameAndTimeStampForLog(request, file);
 
                 Iterator dataFilesIt = dataFileList.iterator();
                 File rowFile = null;
@@ -356,7 +353,7 @@ public class RestfulServiceHelper {
 
                         String originalFileName = rowFile.getName();
                         post.setHeader("originalFileName", originalFileName);
-                        post.setHeader("logFileName", logFileName);
+   //                     post.setHeader("logFileName", logFileName);
 
                         MultipartEntityBuilder builder = MultipartEntityBuilder.create();
                         builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
@@ -381,17 +378,11 @@ public class RestfulServiceHelper {
                         CloseableHttpClient httpClient = HttpClients.createDefault();
                         HttpResponse response = httpClient.execute(post);
 
-                        //print result
-                        int responseCode = response.getStatusLine().getStatusCode();
-
-                        //System.out.println("\nSending 'POST' request to URL : " + importDataWSUrl);
-                        //System.out.println("Response Code : " + responseCode);
-
                         BufferedReader rd = new BufferedReader(
                                 new InputStreamReader(response.getEntity().getContent()));
 
                         StringBuffer result = new StringBuffer();
-                        String line = "";
+                        String line;
                         while ((line = rd.readLine()) != null) {
                             result.append(line);
                         }
@@ -410,23 +401,25 @@ public class RestfulServiceHelper {
                     } catch (OpenClinicaSystemException e) {
                         /*
                          *  write error to log file            	 *
-                         */
-                        String originalFileName = rowFile.getName();
-                        String recordNum = null;
-                        String participantID = "";
-                        if (!e.getErrorCode().equals("errorCode.participantIdHeaderNotMatchingMappingFile"))
-                            participantID = this.getImportDataHelper().getParticipantID(mappingFile, rowFile);
-                        if (originalFileName != null) {
-                            recordNum = originalFileName.substring(originalFileName.lastIndexOf("_") + 1, originalFileName.indexOf("."));
-                            originalFileName = originalFileName.substring(0, originalFileName.lastIndexOf("_"));
-                        }
-                        String msg = recordNum + "," + participantID + ",FAILED," + e.getMessage();
-                        this.getImportDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
+//                         */
+//                        String originalFileName = rowFile.getName();
+//                        String recordNum = null;
+//                        String participantID = "";
+//                        if (!e.getErrorCode().equals("errorCode.participantIdHeaderNotMatchingMappingFile"))
+//                            participantID = this.getImportDataHelper().getParticipantID(mappingFile, rowFile);
+//                        if (originalFileName != null) {
+//                            recordNum = originalFileName.substring(originalFileName.lastIndexOf("_") + 1, originalFileName.indexOf("."));
+//                            originalFileName = originalFileName.substring(0, originalFileName.lastIndexOf("_"));
+//                        }
+//                        String msg = recordNum + "," + participantID + ",FAILED," + e.getMessage();
+//                        this.getImportDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
 
                     }
 
                 }
-                this.getImportDataHelper().addSummaryAndMappingFileInLog(logFileName, mappingFile, request, dataFileList.size());
+
+                //Deprecated - logs now belong under bulk action logs
+                //this.getImportDataHelper().addSummaryAndMappingFileInLog(logFileName, mappingFile, request, dataFileList.size());
                 // after sent, then delete from disk
                 dataFilesIt = dataFileList.iterator();
                 while (dataFilesIt.hasNext()) {
@@ -494,9 +487,9 @@ public class RestfulServiceHelper {
                 ArrayList<File> dataFileList = splitDataFileAndProcesDataRowbyRow(mappingFile, file, studyOID);
                 setDataFileNameAndTimeStampForLog(request, file);
                 // prepare log file
-                String logFileName = null;
-                logFileName = buildLogFile(file.getName(), request);
-                request.setAttribute("logFileName", logFileName);
+//                String logFileName = null;
+//                logFileName = buildLogFile(file.getName(), request);
+//                request.setAttribute("logFileName", logFileName);
 
                 Iterator dataFilesIt = dataFileList.iterator();
                 File rowFile = null;
@@ -529,7 +522,7 @@ public class RestfulServiceHelper {
 
                         String originalFileName = rowFile.getName();
                         post.setHeader("originalFileName", originalFileName);
-                        post.setHeader("logFileName", logFileName);
+ //                       post.setHeader("logFileName", logFileName);
 
                         MultipartEntityBuilder builder = MultipartEntityBuilder.create();
                         builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
@@ -557,9 +550,6 @@ public class RestfulServiceHelper {
                         //print result
                         int responseCode = response.getStatusLine().getStatusCode();
 
-                        //System.out.println("\nSending 'POST' request to URL : " + importDataWSUrl);
-                        //System.out.println("Response Code : " + responseCode);
-
                         BufferedReader rd = new BufferedReader(
                                 new InputStreamReader(response.getEntity().getContent()));
 
@@ -577,26 +567,26 @@ public class RestfulServiceHelper {
                         }
 
                         importCRFInfoSummary.getDetailMessages().add(responseStr);
-                        //System.out.println(responseStr);
 
-                        //TimeUnit.MILLISECONDS.sleep(1);
                     } catch (OpenClinicaSystemException e) {
-                        String originalFileName = rowFile.getName();
-                        String recordNum = null;
-                        String participantID = "";
-                        if (!e.getErrorCode().equals("errorCode.participantIdHeaderNotMatchingMappingFile"))
-                            participantID = this.getImportDataHelper().getParticipantID(mappingFile, rowFile);
-                        if (originalFileName != null) {
-                            recordNum = originalFileName.substring(originalFileName.lastIndexOf("_") + 1, originalFileName.indexOf("."));
-                            originalFileName = originalFileName.substring(0, originalFileName.lastIndexOf("_"));
-                        }
-                        String msg = recordNum + "," + participantID + ",FAILED," + e.getMessage();
-                        this.getImportDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
+//                        String originalFileName = rowFile.getName();
+//                        String recordNum = null;
+//                        String participantID = "";
+//                        if (!e.getErrorCode().equals("errorCode.participantIdHeaderNotMatchingMappingFile"))
+//                            participantID = this.getImportDataHelper().getParticipantID(mappingFile, rowFile);
+//                        if (originalFileName != null) {
+//                            recordNum = originalFileName.substring(originalFileName.lastIndexOf("_") + 1, originalFileName.indexOf("."));
+//                            originalFileName = originalFileName.substring(0, originalFileName.lastIndexOf("_"));
+//                        }
+//                        String msg = recordNum + "," + participantID + ",FAILED," + e.getMessage();
+//                        this.getImportDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
 
                     }
 
                 }
-                this.getImportDataHelper().addSummaryAndMappingFileInLog(logFileName, mappingFile, request, dataFileList.size());
+                //Deprecated - logs now belong under bulk action logs
+                //this.getImportDataHelper().addSummaryAndMappingFileInLog(logFileName, mappingFile, request, dataFileList.size());
+
                 // after sent, then delete from disk
                 dataFilesIt = dataFileList.iterator();
                 while (dataFilesIt.hasNext()) {

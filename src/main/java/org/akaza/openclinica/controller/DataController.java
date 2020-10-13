@@ -697,8 +697,8 @@ public class DataController {
                       		mappingFileTxt = file;
                       		
                       	}else {
-         	 	 	 	 	 logFileName = this.getRestfulServiceHelper().buildLogFile(file.getName(), request);
-         	 	 	 	     request.setAttribute("logFileName", logFileName);
+         	 	 	 	 	 //logFileName = this.getRestfulServiceHelper().buildLogFile(file.getName(), request);
+         	 	 	 	     //request.setAttribute("logFileName", logFileName);
                       	}
                       }
                   }
