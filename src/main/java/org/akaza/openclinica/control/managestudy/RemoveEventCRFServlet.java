@@ -23,10 +23,8 @@ import core.org.akaza.openclinica.bean.managestudy.StudyEventDefinitionBean;
 import core.org.akaza.openclinica.bean.managestudy.StudySubjectBean;
 import core.org.akaza.openclinica.bean.submit.*;
 import core.org.akaza.openclinica.dao.hibernate.StudyDao;
+import core.org.akaza.openclinica.domain.datamap.EventDefinitionCrf;
 import core.org.akaza.openclinica.domain.datamap.Study;
-import org.akaza.openclinica.control.SpringServletAccess;
-import org.akaza.openclinica.control.core.SecureController;
-import org.akaza.openclinica.control.form.FormProcessor;
 import core.org.akaza.openclinica.core.LockInfo;
 import core.org.akaza.openclinica.dao.admin.CRFDAO;
 import core.org.akaza.openclinica.dao.hibernate.EventCrfDao;
@@ -40,8 +38,12 @@ import core.org.akaza.openclinica.dao.submit.EventCRFDAO;
 import core.org.akaza.openclinica.dao.submit.FormLayoutDAO;
 import core.org.akaza.openclinica.dao.submit.ItemDataDAO;
 import core.org.akaza.openclinica.domain.datamap.EventCrf;
-import org.akaza.openclinica.view.Page;
 import core.org.akaza.openclinica.web.InsufficientPermissionException;
+import org.akaza.openclinica.control.SpringServletAccess;
+import org.akaza.openclinica.control.core.SecureController;
+import org.akaza.openclinica.control.form.FormProcessor;
+import org.akaza.openclinica.domain.enumsupport.StudyEventWorkflowStatusEnum;
+import org.akaza.openclinica.view.Page;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -225,6 +227,17 @@ public class RemoveEventCRFServlet extends SecureController {
                             dnDao.update(itemParentNote);
                         }
 
+                }
+
+                boolean isRequiredCrf = false;
+                for (EventDefinitionCrf defCrf: ec.getStudyEvent().getStudyEventDefinition().getEventDefinitionCrfs()) {
+                    if (defCrf.getCrf().getOcOid().equals(ec.getFormLayout().getCrf().getOcOid())) {
+                        isRequiredCrf = defCrf.getRequiredCrf();
+                        break;
+                    }
+                }
+                if (isRequiredCrf && ec.getStudyEvent().getWorkflowStatus() == StudyEventWorkflowStatusEnum.COMPLETED) {
+                    ec.getStudyEvent().setWorkflowStatus(StudyEventWorkflowStatusEnum.DATA_ENTRY_STARTED);
                 }
 
                 request.setAttribute("id", new Integer(studySubId).toString());
