@@ -1075,7 +1075,7 @@ public class EventCRFDAO<K extends String, V extends ArrayList> extends Auditabl
             nullVars.put(4,new Integer(Types.VARCHAR));
         }
         else
-            variables.put(4, SdvStatus.NOT_VERIFIED);
+            variables.put(4, SdvStatus.NOT_VERIFIED.toString());
         variables.put(5, event_crf_id);
         String sql = digester.getQuery("updateFormLayoutID");
         // this is the way to make the change transactional
