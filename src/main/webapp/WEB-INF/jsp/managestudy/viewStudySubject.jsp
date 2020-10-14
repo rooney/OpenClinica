@@ -5,9 +5,11 @@
 <fmt:setBundle basename="org.akaza.openclinica.i18n.words" var="resword"/>
 <fmt:setBundle basename="org.akaza.openclinica.i18n.notes" var="restext"/>
 <link rel="stylesheet" href="includes/font-awesome-4.7.0/css/font-awesome.css">
+<link rel="stylesheet" href="includes/jquery-ccpicker/css/jquery.ccpicker.css">
 <jsp:include page="../include/submit-header.jsp"/>
 <!-- move the alert message to the sidebar-->
 <jsp:include page="../include/sideAlert.jsp"/>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.7.6/handlebars.min.js"></script>
 <script type="text/javascript">
   function onInvokeAction(id,action) {
       if(id.indexOf('findSubjects') == -1)  {
@@ -1295,7 +1297,7 @@
                     <style>
                       #phone-input {
                         padding: 4px !important;
-                        padding-left: 100px !important;
+                        padding-left: 95px !important;
                       }
                       #phone-input-error {
                         display: block;
@@ -1306,9 +1308,9 @@
                       }
                       #country-code {
                         position: absolute;
-                        top: 4px;
-                        left: 54px;
-                        width: 37px;
+                        top: 3px;
+                        left: 45px;
+                        width: 45px;
                         text-align: center;
                       }
                       #country-select {
@@ -1329,21 +1331,16 @@
                         display: inline-block;
                       }
                       #country-flag {
-                        top: 9px;
-                        background: url(images/flags.png) no-repeat 0 0;
-                        width: 20px;
-                        height: 11px;
-                        overflow: hidden;
-                        margin-left: 11px;
-                        display: inline-block;
-                        background-position: 0px -44px;
+                        top: 6px;
+                      }
+                      .nobg {
+                        background-image: none;
                       }
                     </style>
                     <div id="phone-widget">
                       <input id="phone-input" type="text" class="formfield form-control invite-input" onfocus="this.select()"> 
                       <div id="country-select">
-                        <div id="country-flag" class="down-arrow">&nbsp;</div> 
-                        <div id="country-select-down-arrow" class="down-arrow">&nbsp;</div> 
+                        <div id="country-flag" class="cc-picker-flag us">&nbsp;</div><div id="country-select-down-arrow">&nbsp;</div> 
                       </div> 
                       <div id="country-code" class="grayed-out">+1</div> 
                       <div class="subnote hide error" id="phone-input-error">
@@ -1366,205 +1363,31 @@
                           background-color: #618ebb;
                           color: white;
                         }
-                        .country-option:hover .the-country-code {
+                        .country-option:hover .ccode {
                           color: white;
                         }
-                        .the-country-code {
-                          color: #666;
+                        .cc-picker-flag {
+                          margin-left: 7px;
+                        }
+                        .ccode {
+                          color: #999;
+                          padding-left: 7px;
                           padding-right: 10px;
                         }
-                        .flag-holder {
-                          padding-left: 5px;
-                          padding-right: 5px;
-                          padding-top: 1px;
-                        }
-                        .the-flag {
-                          background: url(images/flags.png) no-repeat 0 0;
-                          height: 11px;
-                          overflow: hidden;
-                          margin-left: 11px;
-                          width: 20px;
-                        }
                       </style>
+                      <script id="country-option-tmpl" type="text/x-handlebars-template">
+                        <tr class="country-option" data-country="{{country.code}}">
+                          <td>
+                            <div class="cc-picker-flag {{country.code}}">&nbsp;</div>
+                          </td>
+                          <td>
+                            <span>{{country.countryName}}</span>
+                            <span class="ccode">+{{country.phoneCode}}</span>
+                          </td>
+                        </tr>
+                      </script>
                       <table cellspacing="0">
-                        <tbody>
-                          <tr class="country-option" data-country="AU">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1716px;"></div>
-                              </td>
-                              <td>
-                                  <span>Australia</span>&nbsp;&nbsp;<span class="the-country-code">+61</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="AT">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1331px;"></div>
-                              </td>
-                              <td>
-                                  <span>Austria</span>&nbsp;&nbsp;<span class="the-country-code">+43</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="BE">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px 0px;"></div>
-                              </td>
-                              <td>
-                                  <span>Belgium</span>&nbsp;&nbsp;<span class="the-country-code">+32</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="BR">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -770px;"></div>
-                              </td>
-                              <td>
-                                  <span>Brazil</span>&nbsp;&nbsp;<span class="the-country-code">+55</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="CA">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1375px;"></div>
-                              </td>
-                              <td>
-                                  <span>Canada</span>&nbsp;&nbsp;<span class="the-country-code">+1</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="CL">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1342px;"></div>
-                              </td>
-                              <td>
-                                  <span>Chile</span>&nbsp;&nbsp;<span class="the-country-code">+56</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="CN">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -825px;"></div>
-                              </td>
-                              <td>
-                                  <span>China</span>&nbsp;&nbsp;<span class="the-country-code">+86</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="DK">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1386px;"></div>
-                              </td>
-                              <td>
-                                  <span>Denmark</span>&nbsp;&nbsp;<span class="the-country-code">+45</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="DO">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1529px;"></div>
-                              </td>
-                              <td>
-                                  <span>Dominican Republic</span>&nbsp;&nbsp;<span class="the-country-code">+1</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="FI">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1903px;"></div>
-                              </td>
-                              <td>
-                                  <span>Finland</span>&nbsp;&nbsp;<span class="the-country-code">+358</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="FR">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1012px;"></div>
-                              </td>
-                              <td>
-                                  <span>France</span>&nbsp;&nbsp;<span class="the-country-code">+33</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="DE">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -2509px;"></div>
-                              </td>
-                              <td>
-                                  <span>Germany</span>&nbsp;&nbsp;<span class="the-country-code">+49</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="IN">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1694px;"></div>
-                              </td>
-                              <td>
-                                  <span>India</span>&nbsp;&nbsp;<span class="the-country-code">+91</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="IE">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1969px;"></div>
-                              </td>
-                              <td>
-                                  <span>Ireland</span>&nbsp;&nbsp;<span class="the-country-code">+353</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="IT">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -143px;"></div>
-                              </td>
-                              <td>
-                                  <span>Italy</span>&nbsp;&nbsp;<span class="the-country-code">+39</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="NL">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1441px;"></div>
-                              </td>
-                              <td>
-                                  <span>Netherlands</span>&nbsp;&nbsp;<span class="the-country-code">+31</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="NO">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -121px;"></div>
-                              </td>
-                              <td>
-                                  <span>Norway</span>&nbsp;&nbsp;<span class="the-country-code">+47</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="ES">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1155px;"></div>
-                              </td>
-                              <td>
-                                  <span>Spain</span>&nbsp;&nbsp;<span class="the-country-code">+34</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="SE">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -385px;"></div>
-                              </td>
-                              <td>
-                                  <span>Sweden</span>&nbsp;&nbsp;<span class="the-country-code">+46</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="CH">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -1320px;"></div>
-                              </td>
-                              <td>
-                                  <span>Switzerland</span>&nbsp;&nbsp;<span class="the-country-code">+41</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="GB">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -55px;"></div>
-                              </td>
-                              <td>
-                                  <span>United Kingdom</span>&nbsp;&nbsp;<span class="the-country-code">+44</span>
-                              </td>
-                          </tr>
-                          <tr class="country-option" data-country="US">
-                              <td class="flag-holder">
-                                  <div class="the-flag" style="background-position: 0px -44px;"></div>
-                              </td>
-                              <td>
-                                  <span>United States</span>&nbsp;&nbsp;<span class="the-country-code">+1</span>
-                              </td>
-                          </tr>
-                        </tbody>
+                        <tbody id="countries-list"></tbody>
                       </table>
                     </div>
                   </td>
@@ -1921,7 +1744,7 @@
 
         jQuery('#phone-input').on('input blur paste', function() {
             checkPhoneMaxLength();
-            var phonePattern = /^\+[0-9]{1,3} [0-9]{1,14}$/;
+            var phonePattern = /^\+[0-9]{1,4} [0-9]{1,14}$/;
             var fullPhone = $('#country-code').text() + ' ' + $(this).val();
             var isValid = phonePattern.test(fullPhone);
             var isEmpty = $(this).val().length === 0;
@@ -1980,12 +1803,10 @@
 
         jQuery('#country-options').on('click', 'tr', function() {
             var countryCode = $(this).data('country');
-            var ctr = getCountryByCountryCode(countryCode);
-            if (ctr != null) {
-                jQuery('#country-flag').css('background-position', getBackgroundPositionValue(
-                    ctr.backgroundPositionLeft, ctr.backgroundPositionTop
-                ));
-                jQuery('#country-code').html(ctr.phoneCode);
+            var country = Country.find(countryCode);
+            if (country != null) {
+                jQuery('#country-flag').attr('class', 'cc-picker-flag ' + country.code);
+                jQuery('#country-code').html('+' + country.phoneCode);
             }
             jQuery('#country-options').css('display', 'none');
             $('#phone-input').focus();
@@ -1997,174 +1818,27 @@
             $('#btn-copy, #copy-result, #qrcode').show();
             $('#access-code-input').attr('type', 'text');
         });
-     });
+    });
 
-    function getBackgroundPositionValue(left, top) {
-        return left.toString() + 'px ' + top.toString() + 'px';
-    }
-    function getCountryByCountryCode(countryCode) {
-        for (var i = 0; i < countries.length; i++) {
-            if (countries[i].countryCode == countryCode)
-                return countries[i];
+    var Country = {
+        list: [],
+        find: function(countryCode) {
+            var countries = Country.list;
+            for (var i = 0; i < countries.length; i++) {
+                if (countries[i].code == countryCode)
+                    return countries[i];
+            }
+            return null;
         }
-        return null;
-    }
-    var countries = [
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1716,
-            name: 'Australia',
-            phoneCode: '+61',
-            countryCode: 'AU'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1331,
-            name: 'Austria',
-            phoneCode: '+43',
-            countryCode: 'AT'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: 0,
-            name: 'Belgium',
-            phoneCode: '+32',
-            countryCode: 'BE'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -770,
-            name: 'Brazil',
-            phoneCode: '+55',
-            countryCode: 'BR'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1375,
-            name: 'Canada',
-            phoneCode: '+1',
-            countryCode: 'CA'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1342,
-            name: 'Chile',
-            phoneCode: '+56',
-            countryCode: 'CL'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -825,
-            name: 'China',
-            phoneCode: '+86',
-            countryCode: 'CN'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1386,
-            name: 'Denmark',
-            phoneCode: '+45',
-            countryCode: 'DK'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1529,
-            name: 'Dominican Republic',
-            phoneCode: '+1',
-            countryCode: 'DO'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1903,
-            name: 'Finland',
-            phoneCode: '+358',
-            countryCode: 'FI'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1012,
-            name: 'France',
-            phoneCode: '+33',
-            countryCode: 'FR'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -2509,
-            name: 'Germany',
-            phoneCode: '+49',
-            countryCode: 'DE'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1694,
-            name: 'India',
-            phoneCode: '+91',
-            countryCode: 'IN'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1969,
-            name: 'Ireland',
-            phoneCode: '+353',
-            countryCode: 'IE'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -143,
-            name: 'Italy',
-            phoneCode: '+39',
-            countryCode: 'IT'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1441,
-            name: 'Netherlands',
-            phoneCode: '+31',
-            countryCode: 'NL'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -121,
-            name: 'Norway',
-            phoneCode: '+47',
-            countryCode: 'NO'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1155,
-            name: 'Spain',
-            phoneCode: '+34',
-            countryCode: 'ES'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -385,
-            name: 'Sweden',
-            phoneCode: '+46',
-            countryCode: 'SE'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -1320,
-            name: 'Switzerland',
-            phoneCode: '+41',
-            countryCode: 'CH'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -44,
-            name: 'United States',
-            phoneCode: '+1',
-            countryCode: 'US'
-        },
-        {
-            backgroundPositionLeft: 0,
-            backgroundPositionTop: -55,
-            name: 'United Kingdom',
-            phoneCode: '+44',
-            countryCode: 'GB'
-        }
-    ];
+    };
+    jQuery.getJSON('includes/jquery-ccpicker/data/en.json', function(countries) {
+        Country.list = countries;
+        var countriesList = jQuery('#countries-list');
+        var countryOption = Handlebars.compile(jQuery('#country-option-tmpl').html());
+        countries.forEach(function(country) {
+            countriesList.append(countryOption({country:country}));
+        });
+    });
 
     var form = $('#contactInformationForm');
     form.on('keyup', 'input', function(e) {
