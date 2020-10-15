@@ -1779,7 +1779,7 @@
             $('#country-code').text(countryCode);
             $('#phone-input').val(phoneNumber);
 
-            var country = Country.find(countryCode);
+            var country = countryByPhoneCode[countryCode];
             if (country) {
                 $('#country-flag').attr('class', 'cc-picker-flag ' + country.code);
             }
@@ -1810,7 +1810,7 @@
 
         jQuery('#country-options').on('click', 'tr', function() {
             var phoneCode = $(this).data('phoneCode');
-            var country = Country.find(phoneCode);
+            var country = countryByPhoneCode[phoneCode];
             if (country) {
                 jQuery('#country-flag').attr('class', 'cc-picker-flag ' + country.code);
                 jQuery('#country-code').html('+' + country.phoneCode);
@@ -1840,23 +1840,13 @@
         });
     });
 
-    var Country = {
-        list: [],
-        find: function(phoneCode) {
-            var countries = Country.list;
-            for (var i = 0; i < countries.length; i++) {
-                if ('+' + countries[i].phoneCode == phoneCode)
-                    return countries[i];
-            }
-            return null;
-        }
-    };
+    var countryByPhoneCode = {};
     jQuery.getJSON('includes/jquery-ccpicker/data/en.json', function(countries) {
-        Country.list = countries;
         var countriesList = jQuery('#countries-list');
         var countryOption = Handlebars.compile(jQuery('#country-option-tmpl').html());
         countries.forEach(function(country) {
             countriesList.append(countryOption({country:country}));
+            countryByPhoneCode['+' + country.phoneCode] = country;
         });
     });
 
