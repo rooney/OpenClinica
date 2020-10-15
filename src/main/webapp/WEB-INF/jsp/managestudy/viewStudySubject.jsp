@@ -1347,17 +1347,24 @@
                         <fmt:message key="invite_invalid_phone" bundle="${resword}"/>
                       </div>
                     </div>
-                    <div id="country-options" style="display:none;">
+                    <div>
                       <style>
+                        #country-search {
+                          position: absolute;
+                          z-index: 100;
+                          display: none;
+                        }
                         #country-options {
                           position: absolute;
+                          z-index: 100;
+                          display: none;
                           border: 1px solid #d9d9d9;
                           background-color: white;
+                          margin-top: 34px;
                           padding-left: 0px;
                           padding-right: 0px;
-                          z-index: 100;
                           overflow: auto;
-                          height: 200px;
+                          max-height: 200px;
                         }
                         .country-option:hover {
                           background-color: #618ebb;
@@ -1375,20 +1382,23 @@
                           padding-right: 10px;
                         }
                       </style>
-                      <script id="country-option-tmpl" type="text/x-handlebars-template">
-                        <tr class="country-option" data-country="{{country.code}}">
-                          <td>
-                            <div class="cc-picker-flag {{country.code}}">&nbsp;</div>
-                          </td>
-                          <td>
-                            <span>{{country.countryName}}</span>
-                            <span class="ccode">+{{country.phoneCode}}</span>
-                          </td>
-                        </tr>
-                      </script>
-                      <table cellspacing="0">
-                        <tbody id="countries-list"></tbody>
-                      </table>
+                      <input id="country-search" type="text" placeholder="Search..." class="formfield form-control invite-input">
+                      <div id="country-options"]>
+                        <script id="country-option-tmpl" type="text/x-handlebars-template">
+                          <tr class="country-option" data-phone-code="+{{country.phoneCode}}" data-name="{{country.countryName}}">
+                            <td>
+                              <div class="cc-picker-flag {{country.code}}">&nbsp;</div>
+                            </td>
+                            <td>
+                              <span>{{country.countryName}}</span>
+                              <span class="ccode">+{{country.phoneCode}}</span>
+                            </td>
+                          </tr>
+                        </script>
+                        <table cellspacing="0">
+                          <tbody id="countries-list"></tbody>
+                        </table>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -1764,19 +1774,14 @@
             $('#secid-input').val(participateInfo.identifier);
 
             var phoneParts = participateInfo.phoneNumber.split(' ');
-            var countryCode = phoneParts.shift();
+            var countryCode = phoneParts.shift() || '+1';
             var phoneNumber = phoneParts.join(' ');
-            $('#country-code').text(countryCode || '+1');
+            $('#country-code').text(countryCode);
             $('#phone-input').val(phoneNumber);
 
-            var shownFlag = $('#country-flag').css('background-position');
-            var shownCountryCode = $('#country-options tr.country-option').filter(function() {
-              return $('div.the-flag', this).css('background-position') === shownFlag;
-            }).find('span.the-country-code').text();
-            if (shownCountryCode !== countryCode) {
-              $('#country-options span.the-country-code').filter(function() {
-                return $(this).text() === countryCode;
-              }).click();
+            var country = Country.find(countryCode);
+            if (country) {
+                $('#country-flag').attr('class', 'cc-picker-flag ' + country.code);
             }
 
             $('#email-input-error').hide();
@@ -1798,18 +1803,33 @@
         });
 
         jQuery('#phone-widget').on('click', 'div', function() {
-            $('#country-options').css('display', 'block');
+            $('#country-search').val('').css('display', 'block').focus();
+            $('#countries-list').children().show();
+            $('#country-options').show();
         });
 
         jQuery('#country-options').on('click', 'tr', function() {
-            var countryCode = $(this).data('country');
-            var country = Country.find(countryCode);
-            if (country != null) {
+            var phoneCode = $(this).data('phoneCode');
+            var country = Country.find(phoneCode);
+            if (country) {
                 jQuery('#country-flag').attr('class', 'cc-picker-flag ' + country.code);
                 jQuery('#country-code').html('+' + country.phoneCode);
             }
-            jQuery('#country-options').css('display', 'none');
+            jQuery('#country-options, #country-search').hide();
             $('#phone-input').focus();
+        });
+
+        jQuery('#country-search').on('keyup', function() {
+          var searchTerm = $(this).val().toLowerCase();
+          $('#countries-list').children().each(function() {
+            var countryName = $(this).data('name');
+            if (countryName.toLowerCase().indexOf(searchTerm) > -1) {
+              $(this).show();
+            }
+            else {
+              $(this).hide();
+            }
+          });
         });
 
         jQuery('#eye').click(function() {
@@ -1822,10 +1842,10 @@
 
     var Country = {
         list: [],
-        find: function(countryCode) {
+        find: function(phoneCode) {
             var countries = Country.list;
             for (var i = 0; i < countries.length; i++) {
-                if (countries[i].code == countryCode)
+                if ('+' + countries[i].phoneCode == phoneCode)
                     return countries[i];
             }
             return null;
