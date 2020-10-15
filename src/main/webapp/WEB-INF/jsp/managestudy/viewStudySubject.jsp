@@ -1841,13 +1841,16 @@
     });
 
     var countryByPhoneCode = {};
+    var countryByCountryCode = {};
     jQuery.getJSON('includes/jquery-ccpicker/data/en.json', function(countries) {
         var countriesList = jQuery('#countries-list');
         var countryOption = Handlebars.compile(jQuery('#country-option-tmpl').html());
         countries.forEach(function(country) {
             countriesList.append(countryOption({country:country}));
             countryByPhoneCode['+' + country.phoneCode] = country;
+            countryByCountryCode[country.code] = country;
         });
+        countryByPhoneCode['+1'] = countryByCountryCode['US'];
     });
 
     var form = $('#contactInformationForm');
