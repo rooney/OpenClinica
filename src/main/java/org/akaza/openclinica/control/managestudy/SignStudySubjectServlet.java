@@ -30,6 +30,7 @@ import core.org.akaza.openclinica.bean.submit.CRFVersionBean;
 import core.org.akaza.openclinica.bean.submit.DisplayEventCRFBean;
 import core.org.akaza.openclinica.bean.submit.EventCRFBean;
 import core.org.akaza.openclinica.bean.submit.SubjectBean;
+import core.org.akaza.openclinica.domain.datamap.EventCrf;
 import core.org.akaza.openclinica.domain.datamap.Study;
 import core.org.akaza.openclinica.service.managestudy.StudySubjectService;
 import core.org.akaza.openclinica.web.rest.client.auth.impl.KeycloakClientImpl;
@@ -68,9 +69,11 @@ import org.springframework.web.context.support.WebApplicationContextUtils;
 public class SignStudySubjectServlet extends SecureController {
     private WebApplicationContext ctx = null;
     public static final String ORIGINATING_PAGE = "originatingPage";
+    private final String COMMON = "common";
 
     private EventCRFDAO eventCRFDAO;
     private StudyEventDAO studyEventDAO;
+    private StudyEventDefinitionDAO studyEventDefinitionDAO;
     private StudySubjectService studySubjectService;
     DiscrepancyNoteUtil discNoteUtil;
 
@@ -168,7 +171,16 @@ public class SignStudySubjectServlet extends SecureController {
         for (int l = 0; l < studyEvents.size(); l++) {
             try {
                 StudyEventBean studyEvent = (StudyEventBean) studyEvents.get(l);
-                if(!studyEvent.isRemoved() && !studyEvent.isArchived()) {
+                StudyEventDefinitionBean sed = (StudyEventDefinitionBean) studyEventDefinitionDAO.findByPK(studyEvent.getStudyEventDefinitionId());
+                boolean archivedCommonEvent=false;
+                if(sed.getType().equals(COMMON)){
+                    List <EventCRFBean> eventCrfs = eventCRFDAO.findAllByStudyEvent(studyEvent);
+                    if(eventCrfs.size()!=0 && eventCrfs.get(0).isArchived()){
+                        archivedCommonEvent= true;
+                    }
+                }
+
+                if(!studyEvent.isRemoved() && !studyEvent.isArchived() && !archivedCommonEvent) {
                     studyEvent.setUpdater(ub);
                     Date date = new Date();
                     studyEvent.setUpdatedDate(date);
@@ -189,6 +201,7 @@ public class SignStudySubjectServlet extends SecureController {
         ctx = WebApplicationContextUtils.getWebApplicationContext(context);
         studyEventDAO = (StudyEventDAO) SpringServletAccess.getApplicationContext(context).getBean("studyEventJDBCDao");
         eventCRFDAO = (EventCRFDAO) SpringServletAccess.getApplicationContext(context).getBean("eventCRFJDBCDao");
+        studyEventDefinitionDAO = (StudyEventDefinitionDAO) SpringServletAccess.getApplicationContext(context).getBean("studyEventDefinitionJDBCDao");
         studySubjectService = (StudySubjectService) WebApplicationContextUtils.getWebApplicationContext(getServletContext()).getBean("studySubjectService");
         discNoteUtil = (DiscrepancyNoteUtil) WebApplicationContextUtils.getWebApplicationContext(getServletContext()).getBean("discrepancyNoteUtil");
 
