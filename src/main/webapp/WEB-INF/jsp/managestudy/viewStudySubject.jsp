@@ -1385,7 +1385,7 @@
                       <input id="country-search" type="text" placeholder="Search..." class="formfield form-control invite-input">
                       <div id="country-options"]>
                         <script id="country-option-tmpl" type="text/x-handlebars-template">
-                          <tr class="country-option" data-phone-code="+{{country.phoneCode}}" data-name="{{country.countryName}}">
+                          <tr class="country-option" data-country-code="{{country.code}}" data-name="{{country.countryName}}">
                             <td>
                               <div class="cc-picker-flag {{country.code}}">&nbsp;</div>
                             </td>
@@ -1809,8 +1809,8 @@
         });
 
         jQuery('#country-options').on('click', 'tr', function() {
-            var phoneCode = $(this).data('phoneCode');
-            var country = countryByPhoneCode[phoneCode];
+            var countryCode = $(this).data('countryCode');
+            var country = countryByCountryCode[countryCode];
             if (country) {
                 jQuery('#country-flag').attr('class', 'cc-picker-flag ' + country.code);
                 jQuery('#country-code').html('+' + country.phoneCode);
@@ -1846,11 +1846,22 @@
         var countriesList = jQuery('#countries-list');
         var countryOption = Handlebars.compile(jQuery('#country-option-tmpl').html());
         countries.forEach(function(country) {
+            if (country.phoneCode.length === 4 && country.phoneCode.startsWith('1')) {
+                country.phoneCode = '1';
+            }
             countriesList.append(countryOption({country:country}));
             countryByPhoneCode['+' + country.phoneCode] = country;
             countryByCountryCode[country.code] = country;
         });
         countryByPhoneCode['+1'] = countryByCountryCode['US'];
+        countryByPhoneCode['+44'] = countryByCountryCode['GB'];
+        countryByPhoneCode['+61'] = countryByCountryCode['AU'];
+        countryByPhoneCode['+64'] = countryByCountryCode['NZ'];
+        countryByPhoneCode['+212'] = countryByCountryCode['MA'];
+        countryByPhoneCode['+262'] = countryByCountryCode['RE'];
+        countryByPhoneCode['+358'] = countryByCountryCode['FI'];
+        countryByPhoneCode['+500'] = countryByCountryCode['FK'];
+        countryByPhoneCode['+590'] = countryByCountryCode['GP'];
     });
 
     var form = $('#contactInformationForm');
@@ -1881,4 +1892,4 @@
         return false;
     });
 
-</script>
+</script>s
