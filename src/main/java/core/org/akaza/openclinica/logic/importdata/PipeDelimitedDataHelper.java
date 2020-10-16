@@ -85,16 +85,9 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
      */
     public String transformTextToODMxml(File mappingFile, File rawItemDataFile, HashMap hm) throws OpenClinicaSystemException, IOException {
 
-        String rawMappingStr;
-        String rawItemData;
-        String odmXml = null;
-
-
-        rawMappingStr = this.readFileToString(mappingFile);
-        rawItemData = this.readFileToString(rawItemDataFile);
-
-        odmXml = transformTextToODMxml(rawMappingStr, rawItemData, hm);
-
+        String rawMappingStr = this.readFileToString(mappingFile);
+        String rawItemData = this.readFileToString(rawItemDataFile);
+        String odmXml = transformTextToODMxml(rawMappingStr, rawItemData, hm);
         return odmXml;
 
     }
@@ -156,8 +149,6 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
         Object[] mappingItemGroupOIDs;
 
         try {
-
-
             checkPipeNumber(rawItemData);
 
             columnNms = getDataColumnNames(rawItemData);

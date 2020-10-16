@@ -87,7 +87,7 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
         session.setAttribute(MODULE, module);
 
         String action = request.getParameter("action");
-        HashMap hm = new HashMap();
+        HashMap hm;
 
         String submitted = (String) request.getParameter("submitted");
         if (submitted != null && submitted.equals("true")) {
@@ -180,16 +180,12 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
                 this.response.sendRedirect("/OpenClinica/UploadCRFData?submitted=true");
 
                 //////////////// Start of heavy thread run/////////////////////
-                //sendOneDataRowPerRequestByHttpClient(files,requestMock);
                 final HashMap hmIn = hm;
                 new Thread(new Runnable() {
                     public void run() {
                         try {
-
-
-                            sendOneDataRowPerRequestByHttpClient(files, requestMock, hmIn);
+                            sendDataByHttpClient(files, requestMock, hmIn);
                         } catch (Exception e) {
-                            // TODO Auto-generated catch block
                             logger.error("Error sending data row for request: ", e);
                         }
                         ;
@@ -950,13 +946,8 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
     }
 
 
-    public void sendOneDataRowPerRequestByHttpClient(List<File> files, MockHttpServletRequest mockRequest, HashMap hm) throws Exception {
-
-
-        this.getRestfulServiceHelper().sendOneDataRowPerRequestByHttpClient(files, mockRequest, true, hm);
-		/*SendOneDataRowPerRequestRunnable sendOneDataRowPerRequestRunnable = new SendOneDataRowPerRequestRunnable(this.getRestfulServiceHelper(), files, request);
-		Thread sendOneDataRowPerRequest = new Thread(sendOneDataRowPerRequestRunnable, "sendOneDataRowPerRequest");
-		sendOneDataRowPerRequest.start();*/
+    public void sendDataByHttpClient(List<File> files, MockHttpServletRequest mockRequest, HashMap hm) throws Exception {
+        this.getRestfulServiceHelper().sendDataByHttpClient(files, mockRequest, true, hm);
     }
 
     public String getImportFileDir() {
