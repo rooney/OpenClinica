@@ -1892,4 +1892,4 @@
         return false;
     });
 
-</script>s
+</script>
