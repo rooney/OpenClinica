@@ -266,7 +266,12 @@ public class ImportController {
 
             return null;
         } else {
-            JobDetail jobDetail = userService.persistJobCreated(study, site, userAccount, JobType.XML_IMPORT, fileNm);
+            JobDetail jobDetail;
+            if (isPipeText) {
+                jobDetail = userService.persistJobCreated(study, site, userAccount, JobType.FLAT_FILE_XML_IMPORT, fileNm);
+            } else {
+                jobDetail = userService.persistJobCreated(study, site, userAccount, JobType.XML_IMPORT, fileNm);
+            }
             CompletableFuture<Object> future = CompletableFuture.supplyAsync(() -> {
                 try {
                     importService.validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, isPipeText);

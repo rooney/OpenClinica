@@ -395,8 +395,11 @@ public class ImportServiceImpl implements ImportService {
             logger.info("SubjectData is missing ");
         }
 
-
-        writeToFile(dataImportReports, fileName, JobType.XML_IMPORT);
+        if (isPipeText) {
+            writeToFile(dataImportReports, fileName, JobType.FLAT_FILE_XML_IMPORT);
+        } else {
+            writeToFile(dataImportReports, fileName, JobType.XML_IMPORT);
+        }
 
         if (isSystemUserImport) {
             // For system level import, check if the import failed and return the status
@@ -426,7 +429,7 @@ public class ImportServiceImpl implements ImportService {
         } catch (FileNotFoundException | UnsupportedEncodingException e) {
             logger.error("Error while accessing file to start writing: ", e);
         } finally {
-            if (jobType.equals(JobType.XML_IMPORT))
+            if (jobType.equals(JobType.XML_IMPORT) || jobType.equals(JobType.FLAT_FILE_XML_IMPORT))
                 writer.print(writeImportToTextFile(dataImportReports));
             else if (jobType.equals(JobType.SCHEDULE_EVENT))
                 writer.print(writeBulkEventScheduleOrUpdateToTextFile(dataImportReports));
