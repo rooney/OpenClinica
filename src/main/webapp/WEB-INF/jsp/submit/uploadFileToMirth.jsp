@@ -113,7 +113,7 @@
 </div>
 <br/>
 <div class="homebox_bullets">
-    <a href="Jobs"><b><fmt:message key="check_bulk_action_logs" bundle="${resword}"/></b></a>
+    <a href="Jobs"><b><fmt:message key="view_bulk_action_log" bundle="${resword}"/></b></a>
 </div>
 <br/>
 
@@ -129,12 +129,14 @@
 
     final Logger logger = LoggerFactory.getLogger(getClass().getName());
     ImportDataHelper importDataHelper = new ImportDataHelper();
-
-	String [] fileNames = null;
-	String fname=null;
-
-
+	  String [] fileNames = null;
+	  String fname=null;
     ArrayList<File> fileList = importDataHelper.getPersonalImportLogFile(request,null);
+
+    boolean logsExist = false;
+    if (fileList.size()>0) {
+      logsExist = true;
+    }
 
 
 	BufferedReader readReport;
@@ -219,6 +221,13 @@
 <jsp:include page="../include/footer.jsp"/>
 
 <script type="text/javascript" language="javascript">
+    logsExist();
+    function logsExist() {
+      var oldLogsExist = "<%=logsExist%>";
+      if (oldLogsExist == "false") {
+        document.getElementById('view_logs').hide();
+      }
+    }
     function toggle_visibility(id) {
        var e = document.getElementById(id);
        if (e.style.display == 'none') {
