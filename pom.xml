@@ -24,7 +24,7 @@
         </walkme.url>
 
         <!-- Project's source control URL -->
-        <git.url>git://github.com/OpenClinica/OpenClinica.git</git.url>
+        <git.url>git://github.com/OpenClinica/study-runner.git</git.url>
 
         <!-- Library Versions -->
         <spring.version>4.3.24.RELEASE</spring.version>
@@ -996,7 +996,7 @@
         </testResources>
     </build>
     <scm>
-        <developerConnection>scm:git:https://github.com/OpenClinica/OpenClinica.git</developerConnection>
+        <developerConnection>scm:git:https://github.com/OpenClinica/study-runner.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 
