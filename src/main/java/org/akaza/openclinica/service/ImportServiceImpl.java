@@ -2,17 +2,6 @@ package org.akaza.openclinica.service;
 
 import core.org.akaza.openclinica.bean.login.UserAccountBean;
 import core.org.akaza.openclinica.bean.submit.crfdata.*;
-import core.org.akaza.openclinica.service.JobService;
-import core.org.akaza.openclinica.service.UtilService;
-import org.akaza.openclinica.domain.enumsupport.EventCrfWorkflowStatusEnum;
-import org.akaza.openclinica.domain.enumsupport.SdvStatus;
-import org.akaza.openclinica.domain.enumsupport.StudyEventWorkflowStatusEnum;
-import org.akaza.openclinica.controller.dto.DataImportReport;
-import org.akaza.openclinica.controller.helper.table.ItemCountInForm;
-import org.akaza.openclinica.controller.openrosa.OpenRosaSubmissionController;
-import org.akaza.openclinica.controller.openrosa.QueryService;
-import org.akaza.openclinica.controller.openrosa.SubmissionContainer;
-import org.akaza.openclinica.controller.openrosa.processor.QueryServiceHelperBean;
 import core.org.akaza.openclinica.core.form.xform.QueryBean;
 import core.org.akaza.openclinica.core.form.xform.QueryType;
 import core.org.akaza.openclinica.dao.core.CoreResources;
@@ -21,7 +10,18 @@ import core.org.akaza.openclinica.domain.Status;
 import core.org.akaza.openclinica.domain.datamap.*;
 import core.org.akaza.openclinica.domain.enumsupport.JobType;
 import core.org.akaza.openclinica.domain.user.UserAccount;
+import core.org.akaza.openclinica.service.JobService;
+import core.org.akaza.openclinica.service.UtilService;
 import core.org.akaza.openclinica.service.crfdata.ErrorObj;
+import org.akaza.openclinica.controller.dto.DataImportReport;
+import org.akaza.openclinica.controller.helper.table.ItemCountInForm;
+import org.akaza.openclinica.controller.openrosa.OpenRosaSubmissionController;
+import org.akaza.openclinica.controller.openrosa.QueryService;
+import org.akaza.openclinica.controller.openrosa.SubmissionContainer;
+import org.akaza.openclinica.controller.openrosa.processor.QueryServiceHelperBean;
+import org.akaza.openclinica.domain.enumsupport.EventCrfWorkflowStatusEnum;
+import org.akaza.openclinica.domain.enumsupport.SdvStatus;
+import org.akaza.openclinica.domain.enumsupport.StudyEventWorkflowStatusEnum;
 import org.akaza.openclinica.web.restful.errors.ErrorConstants;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -142,15 +142,15 @@ public class ImportServiceImpl implements ImportService {
 
     @Transactional
     public boolean validateAndProcessFlatFileDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
-                                                   UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-                                                   boolean isSystemUserImport) {
+                                                        UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+                                                        boolean isSystemUserImport) {
         return validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, true);
     }
 
     @Transactional
     public boolean validateAndProcessXMLDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
-                                            UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-                                            boolean isSystemUserImport) {
+                                                   UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+                                                   boolean isSystemUserImport) {
         return validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, false);
     }
 
@@ -180,11 +180,11 @@ public class ImportServiceImpl implements ImportService {
         sdf_fileName.setTimeZone(TimeZone.getTimeZone("GMT"));
 
         String fileName;
-            if (isFlatFile) {
-                fileName = uniqueIdentifier + DASH + envType + UNDERSCORE + JobType.FLAT_FILE_IMPORT + "_" + sdf_fileName.format(new Date()) + ".csv";
-            } else {
-                fileName = uniqueIdentifier + DASH + envType + UNDERSCORE + JobType.XML_IMPORT + "_" + sdf_fileName.format(new Date()) + ".csv";
-            }
+        if (isFlatFile) {
+            fileName = uniqueIdentifier + DASH + envType + UNDERSCORE + JobType.FLAT_FILE_IMPORT + "_" + sdf_fileName.format(new Date()) + ".csv";
+        } else {
+            fileName = uniqueIdentifier + DASH + envType + UNDERSCORE + JobType.XML_IMPORT + "_" + sdf_fileName.format(new Date()) + ".csv";
+        }
 
         logger.debug("Job Filename is : {}", fileName);
 

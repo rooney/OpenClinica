@@ -1,24 +1,6 @@
 package org.akaza.openclinica.controller;
 
 
-import java.io.*;
-import java.nio.file.Files;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.X509Certificate;
-import java.text.MessageFormat;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-import javax.servlet.http.HttpServletRequest;
-import javax.sql.DataSource;
-
 import core.org.akaza.openclinica.bean.core.DataEntryStage;
 import core.org.akaza.openclinica.bean.login.*;
 import core.org.akaza.openclinica.bean.managestudy.StudyEventBean;
@@ -27,45 +9,40 @@ import core.org.akaza.openclinica.bean.submit.DisplayItemBeanWrapper;
 import core.org.akaza.openclinica.bean.submit.EventCRFBean;
 import core.org.akaza.openclinica.bean.submit.crfdata.ODMContainer;
 import core.org.akaza.openclinica.bean.submit.crfdata.SubjectDataBean;
+import core.org.akaza.openclinica.dao.core.CoreResources;
 import core.org.akaza.openclinica.dao.hibernate.StudyDao;
 import core.org.akaza.openclinica.dao.hibernate.UserAccountDao;
-import core.org.akaza.openclinica.dao.login.UserAccountDAO;
 import core.org.akaza.openclinica.domain.datamap.JobDetail;
 import core.org.akaza.openclinica.domain.datamap.Study;
 import core.org.akaza.openclinica.domain.enumsupport.JobType;
 import core.org.akaza.openclinica.domain.user.UserAccount;
 import core.org.akaza.openclinica.exception.OpenClinicaException;
-import core.org.akaza.openclinica.logic.importdata.PipeDelimitedDataHelper;
-import core.org.akaza.openclinica.service.*;
-import org.akaza.openclinica.control.submit.ImportCRFInfo;
-import org.akaza.openclinica.control.submit.ImportCRFInfoContainer;
-import org.akaza.openclinica.control.submit.ImportCRFInfoSummary;
-import org.akaza.openclinica.controller.helper.RestfulServiceHelper;
-import core.org.akaza.openclinica.dao.core.CoreResources;
 import core.org.akaza.openclinica.exception.OpenClinicaSystemException;
 import core.org.akaza.openclinica.i18n.util.ResourceBundleProvider;
+import core.org.akaza.openclinica.logic.importdata.PipeDelimitedDataHelper;
 import core.org.akaza.openclinica.logic.rulerunner.ExecutionMode;
 import core.org.akaza.openclinica.logic.rulerunner.ImportDataRuleRunnerContainer;
+import core.org.akaza.openclinica.service.CustomParameterizedException;
+import core.org.akaza.openclinica.service.DataImportService;
+import core.org.akaza.openclinica.service.StudyBuildService;
+import core.org.akaza.openclinica.service.UtilService;
 import core.org.akaza.openclinica.service.rule.RuleSetServiceInterface;
-
 import core.org.akaza.openclinica.web.restful.data.bean.BaseStudyDefinitionBean;
 import core.org.akaza.openclinica.web.restful.data.validator.CRFDataImportValidator;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import org.akaza.openclinica.control.submit.ImportCRFInfo;
+import org.akaza.openclinica.control.submit.ImportCRFInfoContainer;
+import org.akaza.openclinica.controller.helper.RestfulServiceHelper;
 import org.akaza.openclinica.domain.enumsupport.EventCrfWorkflowStatusEnum;
 import org.akaza.openclinica.service.*;
-import org.akaza.openclinica.view.Page;
 import org.akaza.openclinica.web.restful.errors.ErrorConstants;
 import org.apache.commons.io.ByteOrderMark;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.BOMInputStream;
 import org.apache.commons.lang.StringUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.mime.HttpMultipartMode;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.entity.mime.content.FileBody;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.exolab.castor.mapping.Mapping;
 import org.exolab.castor.xml.Unmarshaller;
 import org.slf4j.Logger;
@@ -74,9 +51,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.validation.DataBinder;
 import org.springframework.validation.Errors;
 import org.springframework.validation.ObjectError;
@@ -85,10 +59,16 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
+import javax.net.ssl.*;
+import javax.servlet.http.HttpServletRequest;
+import javax.sql.DataSource;
+import java.io.*;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
+import java.text.MessageFormat;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author Tao Li
@@ -98,9 +78,8 @@ import io.swagger.annotations.ApiResponses;
 @Api(value = "DataImport", tags = {"Clinical Data"}, description = "REST API for Data Import")
 public class FlatFileImportController {
 
-    protected static final Logger logger = LoggerFactory.getLogger(FlatFileImportController.class);
-    private final Locale locale = new Locale("en_US");
     public static final String USER_BEAN_NAME = "userBean";
+    protected static final Logger logger = LoggerFactory.getLogger(FlatFileImportController.class);
     //CSV file header
     private static final String SAS_FILE_EXTENSION = "sas7bdat";
     private static final String XLSX_FILE_EXTENSION = "xlsx";
@@ -111,60 +90,47 @@ public class FlatFileImportController {
         disableSslVerification();
     }
 
+    private final Locale locale = new Locale("en_US");
+    protected UserAccountBean userBean;
+    @Autowired
+    StudyDao studyDao;
+    @Autowired
+    SasFileConverterServiceImpl sasFileConverterService;
+    @Autowired
+    ExcelFileConverterServiceImpl excelFileConverterService;
+    @Autowired
+    CsvFileConverterServiceImpl csvFileConverterService;
+    @Autowired
+    UserAccountDao userAccountDao;
     @Autowired
     @Qualifier("dataSource")
     private DataSource dataSource;
-
     @Autowired
     private RuleSetServiceInterface ruleSetService;
-
     @Autowired
     private DataImportService dataImportService;
-
     @Autowired
     private CoreResources coreResources;
-
-    @Autowired
-    StudyDao studyDao;
-
     @Autowired
     private StudyBuildService studyBuildService;
-
-    @Autowired
-    SasFileConverterServiceImpl sasFileConverterService;
-
-    @Autowired
-    ExcelFileConverterServiceImpl excelFileConverterService;
-
-    @Autowired
-    CsvFileConverterServiceImpl csvFileConverterService;
-
     @Autowired
     private UtilService utilService;
-
-    @Autowired
-    UserAccountDao userAccountDao;
-
     @Autowired
     private UserService userService;
-
     @Autowired
     private ImportService importService;
-
     @Autowired
     private ValidateService validateService;
-
     private RestfulServiceHelper serviceHelper;
-    protected UserAccountBean userBean;
     private ImportDataResponseSuccessDTO responseSuccessDTO;
     private XmlSchemaValidationHelper schemaValidator = new XmlSchemaValidationHelper();
     private PipeDelimitedDataHelper importDataHelper;
 
-    public FlatFileImportController (StudyDao studyDao, UserAccountDao userAccountDao, ValidateService validateService,
-                                     UtilService utilService, ImportService importService, UserService userService,
-                                     SasFileConverterServiceImpl sasFileConverterService,
-                                     ExcelFileConverterServiceImpl excelFileConverterService,
-                                     CsvFileConverterServiceImpl csvFileConverterService, DataSource dataSource) {
+    public FlatFileImportController(StudyDao studyDao, UserAccountDao userAccountDao, ValidateService validateService,
+                                    UtilService utilService, ImportService importService, UserService userService,
+                                    SasFileConverterServiceImpl sasFileConverterService,
+                                    ExcelFileConverterServiceImpl excelFileConverterService,
+                                    CsvFileConverterServiceImpl csvFileConverterService, DataSource dataSource) {
         this.studyDao = studyDao;
         this.userAccountDao = userAccountDao;
         this.validateService = validateService;
@@ -176,6 +142,43 @@ public class FlatFileImportController {
         this.csvFileConverterService = csvFileConverterService;
         this.responseSuccessDTO = new ImportDataResponseSuccessDTO();
         this.dataSource = dataSource;
+    }
+
+    private static void disableSslVerification() {
+        try {
+            // Create a trust manager that does not validate certificate chains
+            TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
+                public X509Certificate[] getAcceptedIssuers() {
+                    return null;
+                }
+
+                public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                }
+
+                public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                }
+            }
+            };
+
+            // Install the all-trusting trust manager
+            SSLContext sc = SSLContext.getInstance("SSL");
+            sc.init(null, trustAllCerts, new java.security.SecureRandom());
+            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+            // Create all-trusting host name verifier
+            HostnameVerifier allHostsValid = new HostnameVerifier() {
+                public boolean verify(String hostname, SSLSession session) {
+                    return true;
+                }
+            };
+
+            // Install the all-trusting host verifier
+            HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+        } catch (NoSuchAlgorithmException e) {
+            logger.error("Disabling SSL Verification failed: ", e);
+        } catch (KeyManagementException e) {
+            logger.error("Disabling SSL Verification failed: ", e);
+        }
     }
 
     @ApiOperation(value = "To import study data in XML file (Deprecated, please use /clinicaldata/import endpoint)", notes = "Will read the data in XML file and validate study,event and participant against the  setup first, for more detail please refer to OpenClinica online document  ")
@@ -418,7 +421,7 @@ public class FlatFileImportController {
                     errorMsgs.add(errorOBject);
 
                     /**
-                     * log error into log file 
+                     * log error into log file
                      */
                     isLogUpdated = true;
                     String participantId = odmContainer.getCrfDataPostImportContainer().getSubjectData().get(0).getStudySubjectID();
@@ -515,7 +518,7 @@ public class FlatFileImportController {
                 List<String> ruleActionMsgs = dataImportService.runRules(studyBean, userBean, containers, ruleSetService, ExecutionMode.SAVE);
 
                 /**
-                 *  Now it's time to log successful message into log file                      
+                 *  Now it's time to log successful message into log file
                  */
                 String participantId = odmContainer.getCrfDataPostImportContainer().getSubjectData().get(0).getStudySubjectID();
                 String originalFileName = request.getHeader("originalFileName");
@@ -645,45 +648,6 @@ public class FlatFileImportController {
 
         return serviceHelper;
     }
-
-
-    private static void disableSslVerification() {
-        try {
-            // Create a trust manager that does not validate certificate chains
-            TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
-                public X509Certificate[] getAcceptedIssuers() {
-                    return null;
-                }
-
-                public void checkClientTrusted(X509Certificate[] certs, String authType) {
-                }
-
-                public void checkServerTrusted(X509Certificate[] certs, String authType) {
-                }
-            }
-            };
-
-            // Install the all-trusting trust manager
-            SSLContext sc = SSLContext.getInstance("SSL");
-            sc.init(null, trustAllCerts, new java.security.SecureRandom());
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-
-            // Create all-trusting host name verifier
-            HostnameVerifier allHostsValid = new HostnameVerifier() {
-                public boolean verify(String hostname, SSLSession session) {
-                    return true;
-                }
-            };
-
-            // Install the all-trusting host verifier
-            HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
-        } catch (NoSuchAlgorithmException e) {
-            logger.error("Disabling SSL Verification failed: ", e);
-        } catch (KeyManagementException e) {
-            logger.error("Disabling SSL Verification failed: ", e);
-        }
-    }
-
 
     @ApiOperation(value = "To import study data in Pipe Delimited Text File (Supports Common events with non-repeating item groups only)", notes = "Will read both the data text files and  one mapping text file, then validate study,event and participant against the  setup first, for more detail please refer to OpenClinica online document  ")
     @ApiResponses(value = {

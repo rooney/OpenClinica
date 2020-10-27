@@ -1,37 +1,24 @@
 package org.akaza.openclinica.controller.helper;
 
-import com.google.common.io.Files;
 import core.org.akaza.openclinica.bean.core.Role;
 import core.org.akaza.openclinica.bean.login.StudyUserRoleBean;
 import core.org.akaza.openclinica.bean.login.UserAccountBean;
-import core.org.akaza.openclinica.dao.hibernate.StudyDao;
-import core.org.akaza.openclinica.domain.datamap.Study;
-import core.org.akaza.openclinica.service.StudyBuildService;
-import org.akaza.openclinica.control.SpringServletAccess;
-import org.akaza.openclinica.control.submit.ImportCRFInfoSummary;
 import core.org.akaza.openclinica.dao.core.CoreResources;
+import core.org.akaza.openclinica.dao.hibernate.StudyDao;
 import core.org.akaza.openclinica.dao.login.UserAccountDAO;
+import core.org.akaza.openclinica.domain.datamap.Study;
 import core.org.akaza.openclinica.exception.OpenClinicaException;
 import core.org.akaza.openclinica.exception.OpenClinicaSystemException;
 import core.org.akaza.openclinica.logic.importdata.PipeDelimitedDataHelper;
+import core.org.akaza.openclinica.service.StudyBuildService;
+import org.akaza.openclinica.control.SpringServletAccess;
 import org.akaza.openclinica.service.CsvFileConverterServiceImpl;
 import org.akaza.openclinica.service.ExcelFileConverterServiceImpl;
 import org.akaza.openclinica.service.SasFileConverterServiceImpl;
 import org.akaza.openclinica.web.restful.errors.ErrorConstants;
-import org.apache.commons.lang.StringUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.mime.HttpMultipartMode;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.entity.mime.content.FileBody;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Configurable;
-import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -42,16 +29,15 @@ import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import javax.sql.DataSource;
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.sql.Connection;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.*;
-
-import static org.akaza.openclinica.control.core.SecureController.USER_BEAN_NAME;
+import java.util.Date;
+import java.util.Scanner;
 
 @Configurable
 @Service("serviceHelper")
