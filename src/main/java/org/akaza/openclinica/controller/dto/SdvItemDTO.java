@@ -21,6 +21,7 @@ public class SdvItemDTO {
     private String sdvStatus;
     private int openQueriesCount;
     private boolean isCalculateItem;
+    private boolean deleted;
 
     public boolean isCalculateItem() {
         return isCalculateItem;
@@ -165,4 +166,8 @@ public class SdvItemDTO {
     public void setItemGroupName(String itemGroupName) {
         this.itemGroupName = itemGroupName;
     }
+
+    public boolean isDeleted() { return deleted; }
+
+    public void setDeleted(boolean deleted) { this.deleted = deleted; }
 }

@@ -869,7 +869,9 @@ public class SDVUtil {
 
             for(ItemData itemData: xformOrderedItemDatas){
                 if(itemDataSdvItemMap.get(itemData)!= null){
-                    orderedSdvItemDTOS.add(itemDataSdvItemMap.get(itemData));
+                    SdvItemDTO sdvItem = itemDataSdvItemMap.get(itemData);
+                    sdvItem.setDeleted(itemData.isDeleted());
+                    orderedSdvItemDTOS.add(sdvItem);
                 }
             }
             sdvDTO.setSdvItems(orderedSdvItemDTOS);

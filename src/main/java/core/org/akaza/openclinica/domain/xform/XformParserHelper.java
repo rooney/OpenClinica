@@ -181,6 +181,10 @@ public class XformParserHelper {
                     repeatingItemGroupsSet.remove(itemGroupName);
                 }
             }
+            for (ItemData deletedItem : itemLabelAndGroupNameMap.values()) {
+                deletedItem.setDeleted(true);
+                xformOrderItemDataList.add(deletedItem);
+            }
 
         }catch (Exception e){
             xformOrderItemDataList = itemDataList;
