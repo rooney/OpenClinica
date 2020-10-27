@@ -22,9 +22,17 @@ import java.util.List;
 
 public interface ImportService {
 
+    boolean validateAndProcessXMLDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
+                                         UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+                                         boolean isSystemUserImport);
+
+    boolean validateAndProcessFlatFileDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
+                                         UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+                                         boolean isSystemUserImport);
+
     boolean validateAndProcessDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
                                          UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-                                         boolean isSystemUserImport, boolean isPipeText);
+                                         boolean isSystemUserImport, boolean isFlatFile);
 
     Object validateStudySubject(SubjectDataBean subjectDataBean, Study tenantStudy);
 

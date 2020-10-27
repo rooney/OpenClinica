@@ -2,7 +2,6 @@ package org.akaza.openclinica.service;
 
 import core.org.akaza.openclinica.bean.login.UserAccountBean;
 import core.org.akaza.openclinica.bean.submit.crfdata.*;
-import core.org.akaza.openclinica.service.CustomParameterizedException;
 import core.org.akaza.openclinica.service.JobService;
 import core.org.akaza.openclinica.service.UtilService;
 import org.akaza.openclinica.domain.enumsupport.EventCrfWorkflowStatusEnum;
@@ -140,10 +139,25 @@ public class ImportServiceImpl implements ImportService {
     SimpleDateFormat sdf_fileName = new SimpleDateFormat("yyyy-MM-dd'-'HHmmssSSS'Z'");
     SimpleDateFormat sdf_logFile = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 
+
+    @Transactional
+    public boolean validateAndProcessFlatFileDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
+                                                   UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+                                                   boolean isSystemUserImport) {
+        return validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, true);
+    }
+
+    @Transactional
+    public boolean validateAndProcessXMLDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
+                                            UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+                                            boolean isSystemUserImport) {
+        return validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, false);
+    }
+
     @Transactional
     public boolean validateAndProcessDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
                                                 UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-                                                boolean isSystemUserImport, boolean isPipeText) {
+                                                boolean isSystemUserImport, boolean isFlatFile) {
         CoreResources.setRequestSchema(schema);
         Study tenantStudy;
         if (siteOid != null) {
@@ -166,8 +180,8 @@ public class ImportServiceImpl implements ImportService {
         sdf_fileName.setTimeZone(TimeZone.getTimeZone("GMT"));
 
         String fileName;
-            if (isPipeText) {
-                fileName = uniqueIdentifier + DASH + envType + UNDERSCORE + JobType.FLAT_FILE_XML_IMPORT + "_" + sdf_fileName.format(new Date()) + ".csv";
+            if (isFlatFile) {
+                fileName = uniqueIdentifier + DASH + envType + UNDERSCORE + JobType.FLAT_FILE_IMPORT + "_" + sdf_fileName.format(new Date()) + ".csv";
             } else {
                 fileName = uniqueIdentifier + DASH + envType + UNDERSCORE + JobType.XML_IMPORT + "_" + sdf_fileName.format(new Date()) + ".csv";
             }
@@ -395,8 +409,8 @@ public class ImportServiceImpl implements ImportService {
             logger.info("SubjectData is missing ");
         }
 
-        if (isPipeText) {
-            writeToFile(dataImportReports, fileName, JobType.FLAT_FILE_XML_IMPORT);
+        if (isFlatFile) {
+            writeToFile(dataImportReports, fileName, JobType.FLAT_FILE_IMPORT);
         } else {
             writeToFile(dataImportReports, fileName, JobType.XML_IMPORT);
         }
@@ -429,7 +443,7 @@ public class ImportServiceImpl implements ImportService {
         } catch (FileNotFoundException | UnsupportedEncodingException e) {
             logger.error("Error while accessing file to start writing: ", e);
         } finally {
-            if (jobType.equals(JobType.XML_IMPORT) || jobType.equals(JobType.FLAT_FILE_XML_IMPORT))
+            if (jobType.equals(JobType.XML_IMPORT) || jobType.equals(JobType.FLAT_FILE_IMPORT))
                 writer.print(writeImportToTextFile(dataImportReports));
             else if (jobType.equals(JobType.SCHEDULE_EVENT))
                 writer.print(writeBulkEventScheduleOrUpdateToTextFile(dataImportReports));

@@ -1,17 +1,14 @@
 package org.akaza.openclinica.controller;
 
 import core.org.akaza.openclinica.bean.login.*;
-import core.org.akaza.openclinica.i18n.util.ResourceBundleProvider;
 import core.org.akaza.openclinica.service.CustomParameterizedException;
 import core.org.akaza.openclinica.service.DataImportService;
 import core.org.akaza.openclinica.service.UtilService;
-import core.org.akaza.openclinica.service.crfdata.ErrorObj;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import core.org.akaza.openclinica.bean.rule.XmlSchemaValidationHelper;
 import core.org.akaza.openclinica.bean.submit.crfdata.ODMContainer;
 import org.akaza.openclinica.control.SpringServletAccess;
-import org.akaza.openclinica.controller.dto.DataImportReport;
 import org.akaza.openclinica.controller.helper.RestfulServiceHelper;
 import core.org.akaza.openclinica.dao.core.CoreResources;
 import core.org.akaza.openclinica.dao.hibernate.StudyDao;
@@ -44,8 +41,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.io.*;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.ResourceBundle;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -54,8 +49,8 @@ import java.util.concurrent.CompletableFuture;
  */
 @RestController
 @RequestMapping( value = "/auth/api" )
-@Api( value = "ImportController", tags = {"Clinical Data"}, description = "REST API for Data Import" )
-public class ImportController {
+@Api( value = "XmlImportController", tags = {"Clinical Data"}, description = "REST API for Data Import" )
+public class XmlImportController {
 
     @Autowired
     private UserService userService;
@@ -79,11 +74,10 @@ public class ImportController {
     private DataImportService dataImportService;
 
     protected final Logger logger = LoggerFactory.getLogger(getClass().getName());
-    private static final String ENTITY_NAME = "ImportController";
     public static final String FAILED = "Failed";
     private XmlSchemaValidationHelper schemaValidator = new XmlSchemaValidationHelper();
 
-    public ImportController() {
+    public XmlImportController() {
     }
 
 
@@ -93,9 +87,6 @@ public class ImportController {
 
         String fileNm = "";
         String importXml;
-
-        //for generating logs for flat file imports
-        Boolean isPipeText = request.getHeader("PIPETEXT").contentEquals("PIPETEXT");
 
         if (file != null) {
             fileNm = file.getOriginalFilename();
@@ -214,7 +205,7 @@ public class ImportController {
 
         String uuid;
         try {
-            uuid = startImportJob(odmContainer, schema, studyOid, siteOid, userAccountBean, fileNm, isSystemUserImport, isPipeText);
+            uuid = startImportJob(odmContainer, schema, studyOid, siteOid, userAccountBean, fileNm, isSystemUserImport);
         } catch (CustomParameterizedException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
@@ -247,8 +238,7 @@ public class ImportController {
     }
 
     public String startImportJob(ODMContainer odmContainer, String schema, String studyOid, String siteOid,
-                                 UserAccountBean userAccountBean, String fileNm, boolean isSystemUserImport,
-                                 boolean isPipeText) {
+                                 UserAccountBean userAccountBean, String fileNm, boolean isSystemUserImport) {
         utilService.setSchemaFromStudyOid(studyOid);
 
         Study site = studyDao.findByOcOID(siteOid);
@@ -257,7 +247,7 @@ public class ImportController {
         if (isSystemUserImport) {
             // For system level imports, instead of running import as an asynchronous job, run it synchronously
             logger.debug("Running import synchronously");
-            boolean isImportSuccessful = importService.validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, null, isSystemUserImport, isPipeText);
+            boolean isImportSuccessful = importService.validateAndProcessXMLDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, null, isSystemUserImport);
 
             if (!isImportSuccessful) {
                 // Throw an error if import fails such that randomize service can update the status accordingly
@@ -266,15 +256,10 @@ public class ImportController {
 
             return null;
         } else {
-            JobDetail jobDetail;
-            if (isPipeText) {
-                jobDetail = userService.persistJobCreated(study, site, userAccount, JobType.FLAT_FILE_XML_IMPORT, fileNm);
-            } else {
-                jobDetail = userService.persistJobCreated(study, site, userAccount, JobType.XML_IMPORT, fileNm);
-            }
+            JobDetail jobDetail = userService.persistJobCreated(study, site, userAccount, JobType.XML_IMPORT, fileNm);
             CompletableFuture<Object> future = CompletableFuture.supplyAsync(() -> {
                 try {
-                    importService.validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, isPipeText);
+                    importService.validateAndProcessXMLDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport);
                 } catch (Exception e) {
                     logger.error("Exception is thrown while processing dataImport: " + e);
                     userService.persistJobFailed(jobDetail,fileNm);
@@ -292,9 +277,5 @@ public class ImportController {
 
         return new File(SpringServletAccess.getPropertiesDir(context) + fileNm);
     }
-
-
-
-
 
 }
