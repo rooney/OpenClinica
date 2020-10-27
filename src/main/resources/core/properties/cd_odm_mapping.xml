@@ -174,7 +174,7 @@
 
         <field name="removed"
                type="java.lang.String">
-            <bind-xml name="Removed" node="attribute"/>
+            <bind-xml name="OpenClinica:Removed" node="attribute"/>
         </field>
 
         <field name="ItemData"
