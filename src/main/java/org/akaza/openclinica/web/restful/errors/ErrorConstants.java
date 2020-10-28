@@ -117,6 +117,7 @@ public class ErrorConstants {
     public static final String ERR_ITEMGROUP_REPEATKEY_NOT_VALID = "errorCode.groupRepeatKeyNotValid";
     public static final String ERR_ITEMGROUP_REPEATKEY_LESS_THAN_ONE = "errorCode.groupRepeatKeyLessThanOne";
     public static final String ERR_ITEMGROUP_REPEATKEY_LARGER_THAN_ONE = "errorCode.repeatKeyLargerThanOne";
+    public static final String ERR_ITEMGROUP_IS_ALREADY_REMOVED = "errorCode.itemGroupIsAlreadyRemoved";
 
     public static final String ERR_MULTIPLE_PARTICIPANTS_FOUND = "errorCode.multipleParticipantsFound";
     public static final String ERR_REPEAT_KEY_AND_FORM_MISMATCH = "errorCode.repeatKeyAndFormMismatch";
@@ -196,5 +197,37 @@ public class ErrorConstants {
     public static final String ERR_EVENT_ORDINAL_IS_INCORRECT = "errorCode.eventOrdinalIsIncorrect";
 
     public static final String ERR_HAS_NO_ACCESS_TO_FORM = "errorCode.hasNoAccessToForm";
+    public static final String ERR_DISCREPANCY_NOTE_STATUS_NOT_VALID = "errorCode.discrepancyNoteStatusNotValid";
+    public static final String ERR_MISSING_DISCREPANCY_NOTE_STATUS = "errorCode.missingDiscrepancyNoteStatus";
+    public static final String ERR_DISCREPANCY_NOTE_TYPE_NOT_VALID = "errorCode.discrepancyNoteTypeNotValid";
+    public static final String ERR_MISSING_DISCREPANCY_NOTE_TYPE = "errorCode.missingDiscrepancyNoteType";
+    public static final String ERR_DISCREPANCY_NOTE_ID_TOO_LONG = "errorCode.discrepancyNoteIdTooLong";
+    public static final String ERR_DISCREPANCY_NOTE_ID_IS_REDUNDANT = "errorCode.discrepancyNoteIdIsRedundant";
+    public static final String ERR_USER_NOT_VALID = "errorCode.userNotValid";
+    public static final String ERR_MISSING_USER_NAME = "errorCode.missingUserName";
+    public static final String ERR_ASSIGNED_USER_NOT_VALID = "errorCode.assignedUserNotValid";
+    public static final String ERR_DETAILED_NOTE_MISSING = "errorCode.detailedNoteMissing";
+    public static final String ERR_DETAILED_NOTE_TOO_LONG = "errorCode.detailedNoteTextTooLong";
+    public static final String ERR_QUERY_STATUS_NOT_APPLICABLE = "errorCode.queryStatusNotApplicable";
+    public static final String ERR_NEW_QUERIES_IN_BETWEEN_OLD_QUERIES = "errorCode.newQueryInBetweenOldQueries";
+    public static final String ERR_ANNOTATION_MUST_HAVE_ONE_CHILD_NOTE = "errorCode.annotationMustHaveOneChildNote";
+    public static final String ERR_NOTE_ID_ALREADY_IN_USE = "errorCode.noteIdAlreadyInUse";
+    public static final String ERR_EXISTING_NOTE_ID_ON_OTHER_ITEM = "errorCode.existingNoteIdOnOtherItem";
+    public static final String ERR_GENERATING_DISCREPANCY_NOTE_ID = "errorCode.errorGeneratingDiscrepancyNoteId";
+    public static final String ERR_MISSING_CHILD_NOTE = "errorCode.missingChildNote";
+    public static final String ERR_FORM_STATUS_SHOULD_BE_COMPLETE_FOR_SDV_VERIFICATION = "errorCode.formStatusShouldBeCompleteForSettingSdvVerifiedStatus";
+    public static final String ERR_SDV_STATUS_NOT_VALID = "errorCode.sdvStatusNotValid";
+    public static final String ERR_SDV_STATUS_NOT_APPLICABLE = "errorCode.sdvStatusNotApplicable";
+    public static final String ERR_FORM_WITH_REMOVED_OR_ARCHIVED_ATTRIBUTE_CANNOT_BE_SDV_VERIFIED = "errorCode.formWithRemovedOrArchivedAttributeCannotBeSdvVerified";
+    public static final String ERR_SDV_STATUS_CANNOT_BE_UPDATED_BECAUSE_OF_ITEM_IMPORT_FAILURE = "errorCode.sdvStatusCannotBeUpdatedBecauseOfItemImportFailure";
+    public static final String ERR_SIGNED_STATUS_INVALID = "errorCode.signedStatusIsInvalid";
+    public static final String ERR_EVENT_IS_NOT_ELIGIBLE_TO_BE_SIGNED = "errorCode.eventIsNotEligibleToBeSigned";
+    public static final String ERR_CANNOT_SIGN_EVENT_WITHOUT_ATTESTATION = "errorcode.cannotSignEventWithoutAttestation";
+    public static final String ERR_ATTESTATION_IS_MISSING = "errorCode.attestationIsMissing";
+    public static final String ERR_ATTESTATION_TEXT_TOO_LONG = "errorCode.attestationTextTooLong";
+    public static final String ERR_STATUS_ATTRIBUTE_INVALID = "errorCode.statusAttributeIsInvalid";
+    public static final String ERR_ITEMGROUP_REMOVED_ATTRIBUTE_INVALID = "errorCode.itemGroupRemovedAttributeIsInvalid";
+    public static final String ERR_FIRST_REPEATING_ITEMGROUP_CANNOT_BE_REMOVED = "errorCode.firstRepeatingGroupCannotBeRemoved";
+    public static final String ERR_NON_REPEATING_ITEMGROUP_CANNOT_BE_REMOVED = "errorCode.nonRepeatingGroupCannotBeRemoved";
 
 }

@@ -23,6 +23,7 @@ import core.org.akaza.openclinica.bean.submit.crfdata.SubjectDataBean;
 import core.org.akaza.openclinica.dao.hibernate.*;
 import core.org.akaza.openclinica.dao.managestudy.EventDefinitionCRFDAO;
 import core.org.akaza.openclinica.dao.submit.FormLayoutDAO;
+import core.org.akaza.openclinica.ocobserver.StudyEventContainer;
 import org.akaza.openclinica.controller.dto.*;
 import org.akaza.openclinica.controller.helper.RestfulServiceHelper;
 import core.org.akaza.openclinica.dao.core.CoreResources;
@@ -40,6 +41,7 @@ import org.akaza.openclinica.web.restful.errors.ErrorConstants;
 import org.akaza.openclinica.service.ImportService;
 import org.akaza.openclinica.service.UserService;
 import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.kafka.common.metrics.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -685,7 +687,7 @@ public class StudyEventServiceImpl implements StudyEventService {
                 eventObject = importService.validateStartAndEndDateAndOrder(studyEventDataBean);
                 if (eventObject instanceof ErrorObj) return eventObject;
 
-                eventObject = importService.scheduleEvent(studyEventDataBean, studySubject, studyEventDefinition, userAccount);
+                eventObject = importService.scheduleEvent(studyEventDataBean, studySubject, studyEventDefinition, userAccount, true);
 
             } else {   // Non Repeat Event
                 studyEventDataBean.setStudyEventRepeatKey(String.valueOf('1'));
@@ -693,7 +695,7 @@ public class StudyEventServiceImpl implements StudyEventService {
                 if (studyEvent == null) {
                     eventObject = importService.validateStartAndEndDateAndOrder(studyEventDataBean);
                     if (eventObject instanceof ErrorObj) return eventObject;
-                    eventObject = importService.scheduleEvent(studyEventDataBean, studySubject, studyEventDefinition, userAccount);
+                    eventObject = importService.scheduleEvent(studyEventDataBean, studySubject, studyEventDefinition, userAccount, true);
                 } else {
                     return new ErrorObj(FAILED, ErrorConstants.ERR_EVENT_ALREADY_EXISTS);
                 }
@@ -795,7 +797,7 @@ public class StudyEventServiceImpl implements StudyEventService {
                 if (eventObject instanceof ErrorObj) return eventObject;
                 eventObject = importService.validateEventTransition(studyEvent, userAccount, studyEventDataBean.getEventStatus());
                 if (eventObject instanceof ErrorObj) return eventObject;
-                eventObject = importService.updateStudyEvntStatus(studyEvent, userAccount, studyEventDataBean.getEventStatus());
+                eventObject = importService.updateStudyEvntStatus(studyEvent, userAccount, studyEventDataBean.getEventStatus(), true);
             }
         }
         return eventObject;
@@ -968,13 +970,47 @@ public void convertStudyEventStatus(String value, StudyEvent studyEvent){
         }
     }
 
-    public boolean isEventSignable(StudyEvent studyEvent){
-        if (!areAllEventCrfsValid(studyEvent) || !areAllRequiredEventCrfsComplete(studyEvent)) {
-            return false;
+    public boolean isEventSignable(StudyEvent studyEvent, StudySubject studySubject){
+        boolean archivedCommonEvent=false;
+        if(studyEvent.getStudyEventDefinition().getType().equals(COMMON)){
+            List <EventCrf> eventCrfs = eventCrfDao.findByStudyEventIdStudySubjectId(studyEvent.getStudyEventId(), studySubject.getOcOid());
+            if(eventCrfs.size()!=0 && eventCrfs.get(0).isCurrentlyArchived()){
+                archivedCommonEvent= true;
+            }
+        }
+
+        if (!studyEvent.isCurrentlyRemoved() && !studyEvent.isCurrentlyArchived() && !archivedCommonEvent) {
+            if (!studyEvent.getWorkflowStatus().equals(StudyEventWorkflowStatusEnum.NOT_SCHEDULED)
+                    && !studyEvent.getWorkflowStatus().equals(StudyEventWorkflowStatusEnum.SKIPPED)
+                    && !studyEvent.getWorkflowStatus().equals(StudyEventWorkflowStatusEnum.STOPPED)
+                    && !studyEvent.getWorkflowStatus().equals(StudyEventWorkflowStatusEnum.COMPLETED)) {
+                return false;
+            } else {
+                if (!areAllEventCrfsValid(studyEvent) || !areAllRequiredEventCrfsComplete(studyEvent)) {
+                    return false;
+                }
+                return true;
+            }
         }
         return true;
     }
 
+    public StudyEvent saveOrUpdate(StudyEvent studyEvent){
+        return studyEventDao.saveOrUpdate(studyEvent);
+    }
+
+    public StudyEvent saveOrUpdateTransactional(StudyEventContainer container){
+        return studyEventDao.saveOrUpdateTransactional(container);
+    }
+
+    public StudyEvent saveOrUpdateTransactionalWithoutAOPListener(StudyEventContainer container){
+        return studyEventDao.saveOrUpdateTransactional(container);
+    }
+
+    public StudyEvent saveOrUpdateWithoutAOPListener(StudyEvent studyEvent){
+        return studyEventDao.saveOrUpdate(studyEvent);
+
+    }
     private boolean areAllEventCrfsValid(StudyEvent studyEvent) {
         List<EventCrf> eventCrfs = studyEvent.getEventCrfs();
         for (EventCrf eventCrf: eventCrfs) {
@@ -1008,6 +1044,10 @@ public void convertStudyEventStatus(String value, StudyEvent studyEvent){
                 collect(Collectors.toList());
 
         for (EventDefinitionCrf requiredEventDefinitionCrf : requiredEventDefinitionCrfs){
+            //archived eventCrf is skipped checking
+            if(requiredEventDefinitionCrf.getStatusId().equals(core.org.akaza.openclinica.domain.Status.DELETED.getCode()) ||
+                    requiredEventDefinitionCrf.getStatusId().equals(core.org.akaza.openclinica.domain.Status.AUTO_DELETED.getCode()))
+                continue;
             boolean requiredFound = false;
             for (EventCrf existingEventCrf : existingEventCrfs){
                 if (existingEventCrf.getCrfVersion().getCrf().getCrfId() == requiredEventDefinitionCrf.getCrf().getCrfId()){

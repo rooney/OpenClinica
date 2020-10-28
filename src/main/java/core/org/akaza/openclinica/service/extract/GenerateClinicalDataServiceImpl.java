@@ -415,10 +415,7 @@ public class GenerateClinicalDataServiceImpl implements GenerateClinicalDataServ
 					dataBean.setCreatedDate(ecrf.getDateCreated());
 					dataBean.setCreatedBy(ecrf.getUserAccount().getUserName());
 					dataBean.setUpdatedDate(ecrf.getDateUpdated());
-					if(ecrf.getLastSdvVerifiedDate() != null)
-						dataBean.setSdvStatus(ecrf.getSdvStatus());
-					else
-						dataBean.setSdvStatus(null);
+					dataBean.setSdvStatus(ecrf.getSdvStatus());
 					//UserAccount updatedUserAccount = userAccountDao.findById(ecrf.getUpdateId());
 					UserAccountBean updatedUserAccount = null;
 					if (ecrf.getUpdateId() != null) {
@@ -746,7 +743,8 @@ public class GenerateClinicalDataServiceImpl implements GenerateClinicalDataServ
 			dnNoteBean = new DiscrepancyNoteBean();
 			dnNoteBean.setStatus(dn.getResolutionStatus().getName());
 			dnNoteBean.setNoteType(dn.getEntityType());
-			dnNoteBean.setOid("DN_" + dn.getDiscrepancyNoteId());
+			dnNoteBean.setDisplayId(dn.getDisplayId());
+				dnNoteBean.setOid("DN_" + dn.getDiscrepancyNoteId());
 			dnNoteBean.setNoteType(dn.getDiscrepancyNoteType().getName());
 
 			dnNoteBean.setDateUpdated(dn.getDateCreated());
@@ -756,6 +754,7 @@ public class GenerateClinicalDataServiceImpl implements GenerateClinicalDataServ
 
 			for (DiscrepancyNote childDN : dn.getChildDiscrepancyNotes()) {
 				ChildNoteBean childNoteBean = new ChildNoteBean();
+				childNoteBean.setDisplayId(childDN.getDisplayId());
 				childNoteBean.setOid("CDN_" + childDN.getDiscrepancyNoteId());
 				ElementRefBean userRef = new ElementRefBean();
 				childNoteBean.setDescription(childDN.getDescription());

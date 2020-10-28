@@ -39,7 +39,7 @@ import com.lowagie.text.pdf.PdfWriter;
  * @author Bruce W. Perry
  *
  */
-public class DownloadDiscrepancyNote implements DownLoadBean{
+public class DownloadDiscrepancyNote {
     public static String CSV ="text/plain; charset=UTF-8";
     public static String PDF = "application/pdf";
     public static String COMMA = ",";
@@ -67,120 +67,27 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
         this.firstColumnHeaderLine = firstColumnHeaderLine;
     }
 
-    public void downLoad(EntityBean bean,
-                         String format,
-                         OutputStream stream) {
-        if(bean == null || stream == null ||
-                !( bean instanceof DiscrepancyNoteBean)){
-            throw new IllegalStateException(
-                    "An invalid parameter was passed to the DownloadDiscrepancyNote.downLoad method.");
-        }
-        DiscrepancyNoteBean discNBean = (DiscrepancyNoteBean) bean;
-        //This must be a ServletOutputStream for our purposes
-        ServletOutputStream servletStream = (ServletOutputStream) stream;
-
-        try{
-            if(CSV.equalsIgnoreCase(format))  {
-                servletStream.print(serializeToString(discNBean, false, 0));
-            } else {
-
-                //Create PDF version
-                serializeToPDF(discNBean,servletStream);
-
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally{
-            if(servletStream != null){
-                try {
-                    servletStream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-
-    }
-
-    public void downLoad(List<EntityBean> listOfBeans, String format,
-                         OutputStream stream) {
-
-        //The List must be of DiscrepancyNoteBeans
-        if (listOfBeans == null ) {
-            return;
-        }
-        StringBuilder allContent = new StringBuilder();
-        String singleBeanContent="";
-
-        for(EntityBean discNoteBean : listOfBeans){
-            if(! (discNoteBean instanceof DiscrepancyNoteBean)) return;
-
-            DiscrepancyNoteBean discNBean = (DiscrepancyNoteBean) discNoteBean;
-            singleBeanContent = serializeToString(discNBean, false, 0);
-            allContent.append(singleBeanContent);
-            allContent.append("\n");
-
-        }
-
-        //This must be a ServletOutputStream for our purposes
-        ServletOutputStream servletStream = (ServletOutputStream) stream;
-
-        try{
-            if(CSV.equalsIgnoreCase(format))  {
-                servletStream.print(allContent.toString());
-            } else {
-
-                //Create PDF version
-                serializeListToPDF(allContent.toString(),servletStream);
-
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally{
-            if(servletStream != null){
-                try {
-                    servletStream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-
-    }
-
-    public int getContentLength(EntityBean bean, String format) {
-        return serializeToString(bean, false, 0).getBytes().length;
-    }
-
-    public int getListContentLength(List<DiscrepancyNoteBean> beans, String format) {
-        int totalLength = 0;
-        int count = 0;
-        for(DiscrepancyNoteBean bean : beans) {
-            ++count;
-            //Only count the byte length of a CSV header row for the first DNote
-            totalLength += serializeToString(bean, (count == 1), 0).getBytes().length;
-            totalLength += "\n".getBytes().length;
-
-        }
-        return totalLength;
-    }
-
     public int getThreadListContentLength(List<DiscrepancyNoteThread> threadBeans) {
         int totalLength = 0;
         int count = 0;
         int threadCount = 1;
         for(DiscrepancyNoteThread discrepancyNoteThread : threadBeans)  {
+            Boolean isParentDiscrepancyNote = true;
+            String parentDisplayId = "";
             for(DiscrepancyNoteBean discNoteBean : discrepancyNoteThread.getLinkedNoteList()) {
                 //DiscrepancyNoteBean discNoteBean = discrepancyNoteThread.getLinkedNoteList().getFirst();
                 ++count;
                 //Only count the byte length of a CSV header row for the first DNote; we're only
                 //using response.setContentlength for CSV format, because apparently it is not
                 //necessary for PDF
-                totalLength += serializeToString(discNoteBean, (count == 1), 0).getBytes().length;
+                totalLength += serializeToString(discNoteBean, (count == 1), 0, parentDisplayId).getBytes().length;
                 //each DN bean with have a column indicating the thread number for the
                 //note
                 totalLength += "\n".getBytes().length;
-
+                if(isParentDiscrepancyNote) {
+                    parentDisplayId = discNoteBean.getDisplayId();
+                    isParentDiscrepancyNote = false;
+                }
             }
             totalLength += ("Thread number: "+threadCount).getBytes().length;
             //increment threadCounter
@@ -192,7 +99,7 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
 
 
     public String serializeToString(EntityBean bean, boolean includeHeaderRow,
-                                    int threadNumber){
+                                    int threadNumber, String parentDisplayId){
         DiscrepancyNoteBean discNoteBean = (DiscrepancyNoteBean) bean;
         StringBuilder writer  = new StringBuilder("");
         //If includeHeaderRow = true, the first row of the output consists of header names, only
@@ -298,10 +205,10 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
         writer.append(escapeQuotesInCSV(threadNumber+""));
         writer.append(",");
 
-        writer.append(escapeQuotesInCSV(discNoteBean.getId()+""));
+        writer.append(escapeQuotesInCSV(discNoteBean.getDisplayId()+""));
         writer.append(",");
 
-        writer.append(discNoteBean.getParentDnId()>0?discNoteBean.getParentDnId():"");
+        writer.append(parentDisplayId);
         writer.append(",");
 
         writer.append(escapeQuotesInCSV(discNoteBean.getCreatedDateString()+""));
@@ -385,27 +292,6 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
 
     }
 
-    private void serializeToPDF(EntityBean bean, OutputStream stream) {
-
-        ServletOutputStream servletStream = (ServletOutputStream) stream;
-        DiscrepancyNoteBean discNBean = (DiscrepancyNoteBean) bean;
-        StringBuilder writer  = new StringBuilder();
-        writer.append(serializeToString(discNBean, false, 0));
-
-        Document pdfDoc = new Document();
-
-        try {
-            PdfWriter.getInstance(pdfDoc,
-                    servletStream);
-            pdfDoc.open();
-            pdfDoc.add(new Paragraph(writer.toString()));
-        } catch (DocumentException e) {
-            e.printStackTrace();
-        }
-        pdfDoc.close();
-
-    }
-
     public void serializeListToPDF(String content, OutputStream stream) {
 
         ServletOutputStream servletStream = (ServletOutputStream) stream;
@@ -417,40 +303,6 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
                     servletStream);
             pdfDoc.open();
             pdfDoc.add(new Paragraph(content));
-        } catch (DocumentException e) {
-            e.printStackTrace();
-        }
-        pdfDoc.close();
-
-    }
-
-    public void serializeListToPDF(List<DiscrepancyNoteBean> listOfBeans,
-                                   OutputStream stream, String studyIdentifier) {
-
-        ServletOutputStream servletStream = (ServletOutputStream) stream;
-
-        Document pdfDoc = new Document();
-
-        try {
-            PdfWriter.getInstance(pdfDoc,
-                    servletStream);
-            pdfDoc.open();
-            //Create header for the study identifier or name
-            if(studyIdentifier != null)  {
-                HeaderFooter header = new HeaderFooter(
-                        new Phrase("Study Identifier: "+studyIdentifier+" pg."),true);
-                header.setAlignment(Element.ALIGN_CENTER);
-                Paragraph para = new Paragraph("Study Identifier: "+studyIdentifier,
-                        new Font(Font.HELVETICA, 18, Font.BOLD, new Color(0, 0, 0)));
-                para.setAlignment(Element.ALIGN_CENTER);
-                pdfDoc.setHeader(header);
-                pdfDoc.add(para);
-            }
-            for(DiscrepancyNoteBean discNoteBean : listOfBeans){
-                pdfDoc.add(this.createTableFromBean(discNoteBean));
-                pdfDoc.add(new Paragraph("\n"));
-            }
-            //pdfDoc.add(new Paragraph(content));
         } catch (DocumentException e) {
             e.printStackTrace();
         }
@@ -480,12 +332,19 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
                 pdfDoc.setHeader(header);
                 pdfDoc.add(para);
             }
+            Boolean isParentDiscrepancyNote = true;
             for(DiscrepancyNoteThread discNoteThread : listOfThreads){
                 pdfDoc.add(this.createTableThreadHeader(discNoteThread));
                 //Just the parent of the thread?  discNoteThread.getLinkedNoteList()
+                isParentDiscrepancyNote = true;
+                String parentDisplayId = "";
                 for(DiscrepancyNoteBean discNoteBean : discNoteThread.getLinkedNoteList()){
                     //DiscrepancyNoteBean discNoteBean = discNoteThread.getLinkedNoteList().getFirst();
-                        pdfDoc.add(this.createTableFromBean(discNoteBean));
+                        pdfDoc.add(this.createTableFromBean(discNoteBean, parentDisplayId));
+                        if(isParentDiscrepancyNote) {
+                            parentDisplayId = discNoteBean.getDisplayId();
+                            isParentDiscrepancyNote = false;
+                        }
                         pdfDoc.add(new Paragraph("\n"));
                 }
             }
@@ -494,56 +353,6 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
             e.printStackTrace();
         }
         pdfDoc.close();
-
-    }
-
-
-    public void downLoadDiscBeans(List<DiscrepancyNoteBean> listOfBeans,
-                                  String format,
-                                  OutputStream stream, String studyIdentifier) {
-
-        if (listOfBeans == null ) {
-            return;
-        }
-        StringBuilder allContent = new StringBuilder();
-        String singleBeanContent="";
-        int counter=0;
-
-        if(CSV.equalsIgnoreCase(format))  {
-
-            for(DiscrepancyNoteBean discNoteBean : listOfBeans){
-                ++counter;
-
-                singleBeanContent = counter == 1 ? serializeToString(discNoteBean, true, 0) : serializeToString(discNoteBean, false, 0);
-                allContent.append(singleBeanContent);
-                allContent.append("\n");
-
-            }
-        }
-
-        //This must be a ServletOutputStream for our purposes
-        ServletOutputStream servletStream = (ServletOutputStream) stream;
-
-        try{
-            if(CSV.equalsIgnoreCase(format))  {
-                servletStream.print(allContent.toString());
-            } else {
-
-                //Create PDF version
-                this.serializeListToPDF(listOfBeans,servletStream, studyIdentifier);
-
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally{
-            if(servletStream != null){
-                try {
-                    servletStream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
 
     }
 
@@ -562,14 +371,19 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
         if(CSV.equalsIgnoreCase(format))  {
             for(DiscrepancyNoteThread dnThread : listOfThreadedBeans ) {
                 threadCounter++;
+                Boolean isParentDiscrepancyNote = true;
+                String parentDisplayId = "";
                 for(DiscrepancyNoteBean discNoteBean : dnThread.getLinkedNoteList()){
                     //DiscrepancyNoteBean discNoteBean = dnThread.getLinkedNoteList().getFirst();
                     ++counter;
 
 
-                        singleBeanContent = counter == 1 ? serializeToString(discNoteBean, true, threadCounter) : serializeToString(discNoteBean, false, threadCounter);
+                        singleBeanContent = counter == 1 ? serializeToString(discNoteBean, true, threadCounter, parentDisplayId) : serializeToString(discNoteBean, false, threadCounter, parentDisplayId);
                         allContent.append(singleBeanContent);
-
+                    if(isParentDiscrepancyNote) {
+                        parentDisplayId = discNoteBean.getDisplayId();
+                        isParentDiscrepancyNote = false;
+                    }
                 }
             }
         }
@@ -714,7 +528,7 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
             cell = createCell("Number of notes",discNoteThread.getLinkedNoteList().size()+"");
             table.addCell(cell);
 
-            cell = createCell("Discrepancy Note ID",dnBean.getId()+"");
+            cell = createCell("Discrepancy Note ID",dnBean.getDisplayId()+"");
             table.addCell(cell);
 
             cell = createCell("Days Open",dnBean.getAge()+"");
@@ -764,7 +578,7 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
         return para;
     }
 
-    private Table createTableFromBean(DiscrepancyNoteBean discBean) throws
+    private Table createTableFromBean(DiscrepancyNoteBean discBean, String parentDisplayId) throws
             BadElementException {
 
         Table table = new Table(2);
@@ -774,7 +588,7 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
         table.setBorderColor(new java.awt.Color(0, 0, 0));
         table.setPadding(4);
         table.setSpacing(4);
-        Cell cell = new Cell("Discrepancy note id: "+discBean.getId());
+        Cell cell = new Cell("Discrepancy note id: "+discBean.getDisplayId());
         cell.setHeader(true);
         cell.setColspan(2);
         table.addCell(cell);
@@ -792,7 +606,7 @@ public class DownloadDiscrepancyNote implements DownLoadBean{
         }
         cell = new Cell("Event name: "+discBean.getEventName());
         table.addCell(cell);
-        cell = new Cell("Parent note ID: "+(discBean.getParentDnId()>0? discBean.getParentDnId():""));
+        cell = new Cell("Parent note ID: "+ parentDisplayId);
         table.addCell(cell);
         cell = new Cell("Resolution status: "+
                 new DiscrepancyNoteUtil().getResolutionStatusName(discBean.getResolutionStatusId()));

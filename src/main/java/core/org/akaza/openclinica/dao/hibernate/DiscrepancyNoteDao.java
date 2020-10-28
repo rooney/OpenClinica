@@ -3,10 +3,13 @@ package core.org.akaza.openclinica.dao.hibernate;
 import java.util.List;
 
 import core.org.akaza.openclinica.domain.datamap.DiscrepancyNote;
+import org.apache.commons.lang3.StringUtils;
 import org.hibernate.query.Query;
 
 public class DiscrepancyNoteDao extends AbstractDomainDao<DiscrepancyNote> {
 
+    private static final String PARENT_DISCREPANCY_NOTE_PREFIX = "DN_";
+    private static final String CHILD_DISCREPANCY_NOTE_PREFIX = "CDN_";
     @Override
     Class<DiscrepancyNote> domainClass() {
         return DiscrepancyNote.class;
@@ -25,6 +28,13 @@ public class DiscrepancyNoteDao extends AbstractDomainDao<DiscrepancyNote> {
             + "where dn.parentDiscrepancyNote is null "
             + "and (dn.resolutionStatus.resolutionStatusId = 1 or dn.resolutionStatus.resolutionStatusId = 2 ) "
             + "and didm.itemData.itemDataId = :itemDataId and dn.discrepancyNoteType.discrepancyNoteTypeId= :noteTypeId";
+
+    static String findClosedParentQueriesByItemDataId = "select dn from DiscrepancyNote dn "
+            + "join DnItemDataMap didm on didm.discrepancyNote.discrepancyNoteId = dn.discrepancyNoteId "
+            + "join DiscrepancyNoteType dnt on dn.discrepancyNoteType.discrepancyNoteTypeId = dnt.discrepancyNoteTypeId "
+            + "where dn.parentDiscrepancyNote is null "
+            + "and dn.resolutionStatus.resolutionStatusId = 4 "
+            + "and didm.itemData.itemDataId = :itemDataId and dn.discrepancyNoteType.discrepancyNoteTypeId= 3";
 
     static String findChildQueriesByItemData = "select dn from DiscrepancyNote dn "
             + "join DnItemDataMap didm on didm.discrepancyNote.discrepancyNoteId = dn.discrepancyNoteId "
@@ -49,6 +59,12 @@ public class DiscrepancyNoteDao extends AbstractDomainDao<DiscrepancyNote> {
         Query q = getCurrentSession().createQuery(findParentOpenQueriesByItemDataIdAndNoteTypeId);
         q.setParameter("itemDataId", itemDataId);
         q.setParameter("noteTypeId", noteTypeId);
+        return (List<DiscrepancyNote>) q.list();
+    }
+
+    public List<DiscrepancyNote> findClosedParentQueriesByItemData(Integer itemDataId) {
+        Query q = getCurrentSession().createQuery(findClosedParentQueriesByItemDataId);
+        q.setParameter("itemDataId", itemDataId);
         return (List<DiscrepancyNote>) q.list();
     }
 
@@ -77,4 +93,27 @@ public class DiscrepancyNoteDao extends AbstractDomainDao<DiscrepancyNote> {
 
     }
 
+    public DiscrepancyNote findByDisplayIdWithoutNotePrefix(String displayId){
+        DiscrepancyNote dn = findByDisplayId(displayId);
+        if(dn != null)
+            return dn;
+        else if(StringUtils.startsWith(displayId, PARENT_DISCREPANCY_NOTE_PREFIX)){
+            //Checking if there is child discrepancy note
+            displayId = "C" + displayId;
+            return findByDisplayId(displayId);
+        }
+        else if(StringUtils.startsWith(displayId, CHILD_DISCREPANCY_NOTE_PREFIX)){
+            //Checking if there is parent discrepancy note
+            displayId = displayId.substring(1);
+            return findByDisplayId(displayId);
+        }
+        return null;
+    }
+
+    public DiscrepancyNote findByDisplayId(String displayId){
+        String query = "from " + getDomainClassName() + " do where do.displayId = :displayId ";
+        Query q = getCurrentSession().createQuery(query);
+        q.setParameter("displayId", displayId);
+        return (DiscrepancyNote) q.uniqueResult();
+    }
 }
