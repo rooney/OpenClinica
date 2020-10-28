@@ -382,18 +382,18 @@ public class CoreResources implements InitializingBean {
     }
 
     public static void setSchema(Connection conn) throws SQLException {
-        String conn_schema = conn.getSchema();
+        String schemaFromConnection = conn.getSchema();
         if (tenantSchema.get() == null)
-            tenantSchema.set(conn_schema);
+            tenantSchema.set(schemaFromConnection);
 
-       String request_or_session_schema = handleMultiSchemaConnection(conn);
+       String schemaFromRequestOrSession = handleMultiSchemaConnection(conn);
 
-        logger.debug("Using schema in CoreResources:schema:" + request_or_session_schema);
-        if (StringUtils.isEmpty(request_or_session_schema) || conn_schema.equalsIgnoreCase(request_or_session_schema))
+        logger.debug("Using schema in CoreResources:schema:" + schemaFromRequestOrSession);
+        if (StringUtils.isEmpty(schemaFromRequestOrSession) || schemaFromConnection.equalsIgnoreCase(schemaFromRequestOrSession))
             return;
         Statement statement = conn.createStatement();
         try {
-            statement.execute("set search_path to '" + request_or_session_schema + "'");
+            statement.execute("set search_path to '" + schemaFromRequestOrSession + "'");
         } finally {
             statement.close();
         }
