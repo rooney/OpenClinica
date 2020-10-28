@@ -1500,8 +1500,10 @@ public class ImportServiceImpl implements ImportService {
 
     private DataImportReport createOrUpdateItem(ImportItemDataBean itemDataBean, CrfBean crf, EventCrf eventCrf, ImportItemGroupDataBean itemGroupDataBean, UserAccount userAccount, ItemCountInForm itemCountInForm, Study study, StudySubject studySubject, String reasonForChange, List<ItemData> itemDatasInItemGroup) {
         ErrorObj errorObj = null;
-        if(itemDataBean.getValue() == null)
+        if(itemDataBean.getValue() == null) {
+            itemCountInForm.setInsertedUpdatedSkippedItemCountInForm(itemCountInForm.getInsertedUpdatedSkippedItemCountInForm() + 1);
             return new DataImportReport(null, null, null, null, null, null, null, null, ITEM_TYPE_KEYWORD, SKIPPED, null, ITEMDATA_SKIPPED_MSG);
+        }
         Item item = itemDao.findByOcOID(itemDataBean.getItemOID());
 
         ItemData itemData = getItemDataFromItemGroup(item, itemDatasInItemGroup);
