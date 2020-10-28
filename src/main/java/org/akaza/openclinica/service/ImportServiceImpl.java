@@ -969,7 +969,7 @@ public class ImportServiceImpl implements ImportService {
 
 
     private Object validateStudyEvent(StudyEventDataBean studyEventDataBean, StudySubject studySubject, UserAccount userAccount) {
-        if (studyEventDataBean.getFormData().size() == 0)
+        if (studyEventDataBean.getFormData().size() == 0 && studyEventDataBean.getSignatures() == null)
             return new ErrorObj(FAILED, ErrorConstants.ERR_EVENT_DOES_NOT_CONTAIN_FORMDATA);
 
         StudyEvent studyEvent = null;
