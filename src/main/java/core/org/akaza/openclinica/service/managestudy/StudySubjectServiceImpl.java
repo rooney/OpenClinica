@@ -568,12 +568,13 @@ public class StudySubjectServiceImpl implements StudySubjectService {
 
         if (studySubject.getStatus().isSigned() || studyEvents.size() == 0){
             return false;}
-
+        boolean atLeastOneEventIsSkippedStoppedCompleted=false;
         for (StudyEvent studyEvent: studyEvents) {
+            atLeastOneEventIsSkippedStoppedCompleted = studyEventService.isEventSkippedStoppedCompleted(studyEvent, studySubject) || atLeastOneEventIsSkippedStoppedCompleted;
             if (!studyEventService.isEventSignable(studyEvent, studySubject))
                 return false;
         }
-        return true;
+        return atLeastOneEventIsSkippedStoppedCompleted;
     }
 
     public DataSource getDataSource() {

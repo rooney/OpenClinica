@@ -38,6 +38,8 @@ public interface StudyEventService {
 
     boolean isEventSignable(StudyEvent studyEvent, StudySubject studySubject);
 
+    boolean isEventSkippedStoppedCompleted(StudyEvent studyEvent, StudySubject studySubject);
+
     StudyEvent saveOrUpdate(StudyEvent studyEvent);
 
     StudyEvent saveOrUpdateTransactional(StudyEventContainer container);

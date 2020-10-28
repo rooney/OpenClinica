@@ -971,6 +971,13 @@ public void convertStudyEventStatus(String value, StudyEvent studyEvent){
     }
 
     public boolean isEventSignable(StudyEvent studyEvent, StudySubject studySubject){
+        if(isEventSkippedStoppedCompleted(studyEvent, studySubject))
+            if (!areAllEventCrfsValid(studyEvent) || !areAllRequiredEventCrfsComplete(studyEvent))
+                    return false;
+        return true;
+    }
+
+    public boolean isEventSkippedStoppedCompleted(StudyEvent studyEvent, StudySubject studySubject){
         boolean archivedCommonEvent=false;
         if(studyEvent.getStudyEventDefinition().getType().equals(COMMON)){
             List <EventCrf> eventCrfs = eventCrfDao.findByStudyEventIdStudySubjectId(studyEvent.getStudyEventId(), studySubject.getOcOid());
@@ -985,14 +992,10 @@ public void convertStudyEventStatus(String value, StudyEvent studyEvent){
                     && !studyEvent.getWorkflowStatus().equals(StudyEventWorkflowStatusEnum.STOPPED)
                     && !studyEvent.getWorkflowStatus().equals(StudyEventWorkflowStatusEnum.COMPLETED)) {
                 return false;
-            } else {
-                if (!areAllEventCrfsValid(studyEvent) || !areAllRequiredEventCrfsComplete(studyEvent)) {
-                    return false;
-                }
+            } else
                 return true;
-            }
         }
-        return true;
+        return false;
     }
 
     public StudyEvent saveOrUpdate(StudyEvent studyEvent){
