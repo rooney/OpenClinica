@@ -639,6 +639,26 @@ public class ImportDataHelper {
         return dataFile;
     }
 
+    /**
+     * @param file
+     * @return
+     * @throws IOException
+     */
+    public static String readFileToString(MultipartFile file) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        try (Scanner sc = new Scanner(file.getInputStream())) {
+            String currentLine;
+
+            while (sc.hasNextLine()) {
+                currentLine = sc.nextLine();
+                sb.append(currentLine);
+            }
+
+        }
+
+        return sb.toString();
+    }
+
     public String getCurrentUserName() {
         return currentUserName;
     }

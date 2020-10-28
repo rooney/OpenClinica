@@ -1,5 +1,6 @@
 package org.akaza.openclinica.service;
 
+import core.org.akaza.openclinica.bean.login.StudyUserRoleBean;
 import core.org.akaza.openclinica.bean.login.UserAccountBean;
 import core.org.akaza.openclinica.bean.submit.crfdata.*;
 import core.org.akaza.openclinica.core.form.xform.QueryBean;
@@ -10,7 +11,12 @@ import core.org.akaza.openclinica.domain.Status;
 import core.org.akaza.openclinica.domain.datamap.*;
 import core.org.akaza.openclinica.domain.enumsupport.JobType;
 import core.org.akaza.openclinica.domain.user.UserAccount;
+import core.org.akaza.openclinica.exception.OpenClinicaException;
+import core.org.akaza.openclinica.exception.OpenClinicaSystemException;
+import core.org.akaza.openclinica.logic.importdata.FlatFileImportDataHelper;
+import core.org.akaza.openclinica.service.CustomParameterizedException;
 import core.org.akaza.openclinica.service.JobService;
+import core.org.akaza.openclinica.service.StudyBuildService;
 import core.org.akaza.openclinica.service.UtilService;
 import core.org.akaza.openclinica.service.crfdata.ErrorObj;
 import org.akaza.openclinica.controller.dto.DataImportReport;
@@ -23,18 +29,24 @@ import org.akaza.openclinica.domain.enumsupport.EventCrfWorkflowStatusEnum;
 import org.akaza.openclinica.domain.enumsupport.SdvStatus;
 import org.akaza.openclinica.domain.enumsupport.StudyEventWorkflowStatusEnum;
 import org.akaza.openclinica.web.restful.errors.ErrorConstants;
+import org.apache.commons.io.ByteOrderMark;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.input.BOMInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.exolab.castor.mapping.Mapping;
+import org.exolab.castor.xml.Unmarshaller;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
+import javax.sql.DataSource;
+import java.io.*;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -116,7 +128,25 @@ public class ImportServiceImpl implements ImportService {
     QueryService queryService;
 
     @Autowired
-    private DiscrepancyNoteDao discrepancyNoteDao;
+    DiscrepancyNoteDao discrepancyNoteDao;
+
+    @Autowired
+    @Qualifier("dataSource")
+    DataSource dataSource;
+
+    @Autowired
+    StudyBuildService studyBuildService;
+
+    @Autowired
+    SasFileConverterServiceImpl sasFileConverterService;
+
+    @Autowired
+    ExcelFileConverterServiceImpl excelFileConverterService;
+
+    @Autowired
+    CsvFileConverterServiceImpl csvFileConverterService;
+
+    public FlatFileImportDataHelper flatFileImportDataHelper;
 
     public static final String COMMON = "common";
     public static final String UNSCHEDULED = "unscheduled";
@@ -136,14 +166,57 @@ public class ImportServiceImpl implements ImportService {
     public static final String DiscrepancyNoteMessage = "import XML";
     public static final String DetailedNotes = "Update via Import";
 
+    //CSV file header
+    private static final String SAS_FILE_EXTENSION = "sas7bdat";
+    private static final String XLSX_FILE_EXTENSION = "xlsx";
+    private static final String CSV_FILE_EXTENSION = "csv";
+    private static final String TXT_FILE_EXTENSION = "txt";
+
     SimpleDateFormat sdf_fileName = new SimpleDateFormat("yyyy-MM-dd'-'HHmmssSSS'Z'");
     SimpleDateFormat sdf_logFile = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 
 
+//    @Transactional
+//    public boolean validateAndProcessFlatFileDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
+//                                                        UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+//                                                        boolean isSystemUserImport) {
+//        return validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, true);
+//    }
+
     @Transactional
-    public boolean validateAndProcessFlatFileDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
-                                                        UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-                                                        boolean isSystemUserImport) {
+    public boolean validateAndProcessFlatFileDataImport(List<File> files, HashMap hm, String studyOid, String siteOid, UserAccountBean userAccountBean,
+                                                        boolean isSystemUserImport, JobDetail jobDetail, String schema) throws Exception {
+        File odmXml = makeOdmXmlFile(files, hm, studyOid);
+        String importXml = FileUtils.readFileToString(odmXml, "UTF-8");
+
+
+        Mapping myMap = new Mapping();
+        String ODM_MAPPING_DIRPath = CoreResources.ODM_MAPPING_DIR;
+        myMap.loadMapping(ODM_MAPPING_DIRPath + File.separator + "cd_odm_mapping.xml");
+
+        Unmarshaller um1 = new Unmarshaller(myMap);
+        ODMContainer odmContainer = new ODMContainer();
+        InputStream inputStream = null;
+        try {
+            // unmarshal xml to java
+            inputStream = new ByteArrayInputStream(importXml.getBytes());
+            String defaultEncoding = "UTF-8";
+
+            BOMInputStream bOMInputStream = new BOMInputStream(inputStream);
+            ByteOrderMark bom = bOMInputStream.getBOM();
+            String charsetName = bom == null ? defaultEncoding : bom.getCharsetName();
+            InputStreamReader reader = new InputStreamReader(new BufferedInputStream(bOMInputStream), charsetName);
+
+            odmContainer = (ODMContainer) um1.unmarshal(reader);
+
+        } catch (Exception e) {
+            logger.error("found exception with xml transform {}", e);
+            throw new OpenClinicaException(e.getMessage(), ErrorConstants.ERR_INVALID_XML_FILE);
+        } finally {
+            inputStream.close();
+        }
+
+
         return validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, true);
     }
 
@@ -1616,4 +1689,112 @@ public class ImportServiceImpl implements ImportService {
             eventCrfDao.saveOrUpdate(eventCrf);
         }
     }
+
+    public File processData(File mappingFile, File dataFile, String studyOID) throws IOException, OpenClinicaException {
+        String importFileDir = this.getFlatFileImportDataHelper().getImportFileDir(studyOID);
+        String fileType = com.google.common.io.Files.getFileExtension(dataFile.getAbsolutePath());
+        if (fileType.equals(SAS_FILE_EXTENSION)) {
+            // convert sas to pipe-delimited
+            dataFile = sasFileConverterService.convert(dataFile);
+        } else if (fileType.equals(XLSX_FILE_EXTENSION)) {
+            // convert xlsx to pipe-delimited
+            dataFile = excelFileConverterService.convert(dataFile);
+        } else if (fileType.equals(CSV_FILE_EXTENSION)) {
+            // convert csv to pipe-delimited
+            dataFile = csvFileConverterService.convert(dataFile);
+        } else if (fileType.equals(TXT_FILE_EXTENSION)) {
+            Properties mappingProperties = readMappingProperties(mappingFile);
+            String delimiter = mappingProperties.getProperty(FlatFileImportDataHelper.DELIMITER_PROPERTY);
+            if (delimiter != null) {
+                if (delimiter.length() != 1) {
+                    throw new OpenClinicaException("Invalid delimiter character", ErrorConstants.INVALID_DELIMITER);
+                }
+                dataFile = csvFileConverterService.convert(dataFile, delimiter.charAt(0));
+            }
+        }
+
+        BufferedReader reader = new BufferedReader(new FileReader(dataFile));
+
+        //get original file name
+        String orginalFileName = dataFile.getName();
+        int pos = orginalFileName.indexOf(".");
+        if (pos > 0) {
+            orginalFileName = orginalFileName.substring(0, pos);
+        }
+
+        //first line
+        String columnLine = reader.readLine();
+        String line = columnLine;
+
+        File oneFile = new File(importFileDir + orginalFileName + ".txt");
+        FileOutputStream fos = new FileOutputStream(oneFile);
+        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
+        bw.write(columnLine);
+
+        try {
+            while (line != null) {
+                // read next line
+                line = reader.readLine();
+                if (line != null) {
+                    bw.write("\r");
+                    bw.write(line);
+                }
+
+            }
+            if (bw != null) {
+                bw.close();
+            }
+            reader.close();
+
+        } catch (Exception e) {
+            logger.error("Error while accessing the process the data: ", e);
+        }
+
+        return oneFile;
+    }
+
+    public FlatFileImportDataHelper getFlatFileImportDataHelper() {
+        if (flatFileImportDataHelper == null) {
+            flatFileImportDataHelper = new FlatFileImportDataHelper(dataSource, studyBuildService, studyDao);
+        }
+        return flatFileImportDataHelper;
+    }
+
+    private Properties readMappingProperties(File mappingFile) throws IOException {
+        Properties mappingProperties = new Properties();
+        mappingProperties.load(new FileReader(mappingFile));
+        return mappingProperties;
+    }
+
+
+    public File makeOdmXmlFile(List<File> files, HashMap hm, String studyOID) throws Exception {
+        /**
+         *  prepare mapping file
+         */
+        File mappingFile = null;
+        for (File file : files) {
+            if (file.getName().toLowerCase().endsWith(".properties")) {
+                mappingFile = file;
+                Study publicStudy = null;
+                if (!org.apache.commons.lang.StringUtils.isEmpty(studyOID))
+                    publicStudy = studyDao.findPublicStudy(studyOID);
+                if (publicStudy != null)
+                    CoreResources.setRequestSchema(publicStudy.getSchemaName());
+                break;
+            }
+        }
+
+        for (File file : files) {
+            // skip mapping file
+            if (file.getName().toLowerCase().endsWith(".properties")) {
+            } else {
+                File dataFile = processData(mappingFile, file, studyOID);
+                String originalFileName = dataFile.getName();
+                String dataStr = this.getFlatFileImportDataHelper().transformTextToODMxml(mappingFile, dataFile, hm);
+                return this.getFlatFileImportDataHelper().saveDataToFile(dataStr, originalFileName, studyOID);
+            }
+        }
+        return null;
+    }
+
 }

@@ -16,10 +16,9 @@ import core.org.akaza.openclinica.domain.datamap.JobDetail;
 import core.org.akaza.openclinica.domain.datamap.Study;
 import core.org.akaza.openclinica.domain.enumsupport.JobType;
 import core.org.akaza.openclinica.domain.user.UserAccount;
-import core.org.akaza.openclinica.exception.OpenClinicaException;
 import core.org.akaza.openclinica.exception.OpenClinicaSystemException;
 import core.org.akaza.openclinica.i18n.util.ResourceBundleProvider;
-import core.org.akaza.openclinica.logic.importdata.PipeDelimitedDataHelper;
+import core.org.akaza.openclinica.logic.importdata.FlatFileImportDataHelper;
 import core.org.akaza.openclinica.logic.rulerunner.ExecutionMode;
 import core.org.akaza.openclinica.logic.rulerunner.ImportDataRuleRunnerContainer;
 import core.org.akaza.openclinica.service.CustomParameterizedException;
@@ -37,12 +36,10 @@ import org.akaza.openclinica.control.submit.ImportCRFInfo;
 import org.akaza.openclinica.control.submit.ImportCRFInfoContainer;
 import org.akaza.openclinica.controller.helper.RestfulServiceHelper;
 import org.akaza.openclinica.domain.enumsupport.EventCrfWorkflowStatusEnum;
-import org.akaza.openclinica.service.*;
+import org.akaza.openclinica.service.ImportService;
+import org.akaza.openclinica.service.UserService;
+import org.akaza.openclinica.service.ValidateService;
 import org.akaza.openclinica.web.restful.errors.ErrorConstants;
-import org.apache.commons.io.ByteOrderMark;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.input.BOMInputStream;
-import org.apache.commons.lang.StringUtils;
 import org.exolab.castor.mapping.Mapping;
 import org.exolab.castor.xml.Unmarshaller;
 import org.slf4j.Logger;
@@ -80,11 +77,6 @@ public class FlatFileImportController {
 
     public static final String USER_BEAN_NAME = "userBean";
     protected static final Logger logger = LoggerFactory.getLogger(FlatFileImportController.class);
-    //CSV file header
-    private static final String SAS_FILE_EXTENSION = "sas7bdat";
-    private static final String XLSX_FILE_EXTENSION = "xlsx";
-    private static final String CSV_FILE_EXTENSION = "csv";
-    private static final String TXT_FILE_EXTENSION = "txt";
 
     static {
         disableSslVerification();
@@ -94,12 +86,6 @@ public class FlatFileImportController {
     protected UserAccountBean userBean;
     @Autowired
     StudyDao studyDao;
-    @Autowired
-    SasFileConverterServiceImpl sasFileConverterService;
-    @Autowired
-    ExcelFileConverterServiceImpl excelFileConverterService;
-    @Autowired
-    CsvFileConverterServiceImpl csvFileConverterService;
     @Autowired
     UserAccountDao userAccountDao;
     @Autowired
@@ -122,27 +108,10 @@ public class FlatFileImportController {
     @Autowired
     private ValidateService validateService;
     private RestfulServiceHelper serviceHelper;
+    private FlatFileImportDataHelper flatFileImportDataHelper;
     private ImportDataResponseSuccessDTO responseSuccessDTO;
     private XmlSchemaValidationHelper schemaValidator = new XmlSchemaValidationHelper();
-    private PipeDelimitedDataHelper importDataHelper;
-
-    public FlatFileImportController(StudyDao studyDao, UserAccountDao userAccountDao, ValidateService validateService,
-                                    UtilService utilService, ImportService importService, UserService userService,
-                                    SasFileConverterServiceImpl sasFileConverterService,
-                                    ExcelFileConverterServiceImpl excelFileConverterService,
-                                    CsvFileConverterServiceImpl csvFileConverterService, DataSource dataSource) {
-        this.studyDao = studyDao;
-        this.userAccountDao = userAccountDao;
-        this.validateService = validateService;
-        this.utilService = utilService;
-        this.importService = importService;
-        this.userService = userService;
-        this.sasFileConverterService = sasFileConverterService;
-        this.excelFileConverterService = excelFileConverterService;
-        this.csvFileConverterService = csvFileConverterService;
-        this.responseSuccessDTO = new ImportDataResponseSuccessDTO();
-        this.dataSource = dataSource;
-    }
+    private FlatFileImportDataHelper importDataHelper;
 
     private static void disableSslVerification() {
         try {
@@ -204,7 +173,7 @@ public class FlatFileImportController {
                 String fileNm = file.getOriginalFilename();
 
                 if (fileNm != null && fileNm.endsWith(".xml")) {
-                    importXml = RestfulServiceHelper.readFileToString(file);
+                    importXml = getFlatFileImportDataHelper().readFileToString(file);
                 } else {
                     throw new OpenClinicaSystemException("errorCode.notXMLfile", "The file format is not supported, please send correct XML file, like *.xml ");
 
@@ -308,7 +277,7 @@ public class FlatFileImportController {
 
             importXml = importXml.substring(beginIndex, endIndex + 6);
 
-            userBean = this.getRestfulServiceHelper().getUserAccount(request);
+            userBean = getFlatFileImportDataHelper().getUserAccount(request);
 
             if (userBean == null) {
                 String err_msg = "Please send request as a valid user";
@@ -317,8 +286,8 @@ public class FlatFileImportController {
                 return errorMsgs;
             }
 
-            File xsdFile = this.getRestfulServiceHelper().getXSDFile(request, "ODM1-3-0.xsd");
-            File xsdFile2 = this.getRestfulServiceHelper().getXSDFile(request, "ODM1-2-1.xsd");
+            File xsdFile = this.getFlatFileImportDataHelper().getXSDFile(request, "ODM1-3-0.xsd");
+            File xsdFile2 = this.getFlatFileImportDataHelper().getXSDFile(request, "ODM1-2-1.xsd");
 
             Mapping myMap = new Mapping();
             String ODM_MAPPING_DIRPath = CoreResources.ODM_MAPPING_DIR;
@@ -367,7 +336,7 @@ public class FlatFileImportController {
 
             // set DB schema
             try {
-                getRestfulServiceHelper().setSchema(studyUniqueID, request);
+                getFlatFileImportDataHelper().setSchema(studyUniqueID, request);
             } catch (OpenClinicaSystemException e) {
                 errors.reject(e.getErrorCode(), e.getMessage());
 
@@ -383,7 +352,7 @@ public class FlatFileImportController {
                     originalFileName = originalFileName.substring(0, originalFileName.lastIndexOf("_"));
                 }
                 String msg = recordNum + "," + participantId + ",FAILED," + e.getMessage();
-                this.dataImportService.getImportCRFDataService().getPipeDelimitedDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
+                this.dataImportService.getImportCRFDataService().getFlatFileImportDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
             }
 
             CRFDataImportValidator crfDataImportValidator = new CRFDataImportValidator(dataSource, studyDao, studyBuildService);
@@ -433,7 +402,7 @@ public class FlatFileImportController {
                         originalFileName = originalFileName.substring(0, originalFileName.lastIndexOf("_"));
                     }
                     String msg = recordNum + "," + participantId + ",FAILED," + err_msg;
-                    this.dataImportService.getImportCRFDataService().getPipeDelimitedDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
+                    this.dataImportService.getImportCRFDataService().getFlatFileImportDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
 
                     return errorMsgs;
                 }
@@ -478,7 +447,7 @@ public class FlatFileImportController {
                         msg = recordNum + "," + participantId + ",FAILED," + err_msg;
                     }
 
-                    this.dataImportService.getImportCRFDataService().getPipeDelimitedDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
+                    this.dataImportService.getImportCRFDataService().getFlatFileImportDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
                     return errorMsgs;
                 }
 
@@ -530,7 +499,7 @@ public class FlatFileImportController {
                 }
                 isLogUpdated = true;
                 String msg = recordNum + "," + participantId + ",SUCCESS," + resWords.getString("imported");
-                this.dataImportService.getImportCRFDataService().getPipeDelimitedDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
+                this.dataImportService.getImportCRFDataService().getFlatFileImportDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
 
                 ImportCRFInfoContainer importCrfInfo = new ImportCRFInfoContainer(odmContainer, dataSource, studyDao);
                 List<String> skippedCRFMsgs = getSkippedCRFMessages(importCrfInfo);
@@ -567,7 +536,7 @@ public class FlatFileImportController {
                 }
                 String msg = recordNum + "," + participantId + ",FAILED," + respage.getString("unexpected_error_occured");
 
-                this.dataImportService.getImportCRFDataService().getPipeDelimitedDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
+                this.dataImportService.getImportCRFDataService().getFlatFileImportDataHelper().writeToMatchAndSkipLog(originalFileName, msg, request);
             }
             throw new Exception(e);
         }
@@ -632,21 +601,10 @@ public class FlatFileImportController {
         return msgList;
     }
 
-    public RuleSetServiceInterface getRuleSetService() {
-        return ruleSetService;
-    }
-
-    public void setRuleSetService(RuleSetServiceInterface ruleSetService) {
-        this.ruleSetService = ruleSetService;
-    }
-
-    public RestfulServiceHelper getRestfulServiceHelper() {
-        if (serviceHelper == null) {
-            serviceHelper = new RestfulServiceHelper(this.dataSource, studyBuildService, studyDao, sasFileConverterService,
-                    excelFileConverterService, csvFileConverterService);
-        }
-
-        return serviceHelper;
+    public FlatFileImportDataHelper getFlatFileImportDataHelper() {
+        if (flatFileImportDataHelper == null)
+            flatFileImportDataHelper = new FlatFileImportDataHelper(dataSource, studyBuildService, studyDao);
+        return flatFileImportDataHelper;
     }
 
     @ApiOperation(value = "To import study data in Pipe Delimited Text File (Supports Common events with non-repeating item groups only)", notes = "Will read both the data text files and  one mapping text file, then validate study,event and participant against the  setup first, for more detail please refer to OpenClinica online document  ")
@@ -655,8 +613,8 @@ public class FlatFileImportController {
             @ApiResponse(code = 400, message = "Bad Request -- Normally means found validation errors, for detail please see the error message")})
 
     @RequestMapping(value = "/pipe", method = RequestMethod.POST)
-    public ResponseEntity<Object> importDataPipeDelimitedFile(HttpServletRequest request, MultipartFile dataFile, MultipartFile mappingFile) throws Exception {
-
+    public ResponseEntity<Object> importDataPipeDelimitedFile(HttpServletRequest request, MultipartFile dataFile, MultipartFile mappingFile) {
+        responseSuccessDTO = new ImportDataResponseSuccessDTO();
         HashMap hm = new HashMap();
 
         MultipartFile[] mFiles = new MultipartFile[2];
@@ -664,13 +622,13 @@ public class FlatFileImportController {
         mFiles[1] = dataFile;
 
         try {
-            String studyOID = this.getRestfulServiceHelper().getImportDataHelper().getStudyOidFromMappingFile(mappingFile);
-            getRestfulServiceHelper().setSchema(studyOID, request);
+            String studyOID = this.getFlatFileImportDataHelper().getStudyOidFromMappingFile(mappingFile);
+            getFlatFileImportDataHelper().setSchema(studyOID, request);
             //only support text file
             if (mFiles[0] != null) {
                 boolean foundMappingFile = false;
 
-                File[] files = this.dataImportService.getImportCRFDataService().getPipeDelimitedDataHelper().convert(mFiles, studyOID);
+                File[] files = this.getFlatFileImportDataHelper().convert(mFiles, studyOID);
 
                 if (files.length < 2) {
                     throw new OpenClinicaSystemException("errorCode.notCorrectFileNumber", "When send files, Please send at least one data text files and  one mapping text file in correct format ");
@@ -685,7 +643,7 @@ public class FlatFileImportController {
                         if (file.getName().toLowerCase().endsWith(".properties")) {
                             foundMappingFile = true;
                             logger.info("Found mapping property file and uploaded");
-                            hm = this.dataImportService.getImportCRFDataService().getPipeDelimitedDataHelper().validateMappingFile(file);
+                            hm = this.getFlatFileImportDataHelper().validateMappingFile(file);
 
                         } else {
                             //logFileName = this.getRestfulServiceHelper().buildLogFile(file.getName(), request);
@@ -699,7 +657,7 @@ public class FlatFileImportController {
                 }
 
                 UserAccountBean userAccountBean = utilService.getUserAccountFromRequest(request);
-                processDataAndStartImportJob(request, Arrays.asList(files), hm, studyOID, userAccountBean);
+                validateStudyOidRolesAndStartImportJob(request, Arrays.asList(files), hm, studyOID, userAccountBean);
 
             } else {
                 throw new OpenClinicaSystemException("errorCode.notCorrectFileNumber", "Please send at least one data text files and  one mapping text file in correct format ");
@@ -712,68 +670,19 @@ public class FlatFileImportController {
         return new ResponseEntity(responseSuccessDTO, org.springframework.http.HttpStatus.OK);
     }
 
+
     /**
-     * Convert files to one odm xml file, create odm container, and start import.
+     * Convert files , and start import.
      * @param request request
      * @param files the mapping file and the txt file
      * @param hm
      * @return response
      * @throws Exception
      */
-    public ResponseEntity<Object> processDataAndStartImportJob(HttpServletRequest request, List<File> files, HashMap hm, String studyOID, UserAccountBean userAccountBean) throws Exception {
+    public ResponseEntity<Object> validateStudyOidRolesAndStartImportJob(HttpServletRequest request, List<File> files, HashMap hm,
+                                                                         String studyOID, UserAccountBean userAccountBean) {
         String validation_passed_message = "SUCCESS";
-        File odmxml = makeOdmXmlFile(files, hm, studyOID);
-        String fileNm = "";
-        String importXml;
-
-        if (odmxml != null) {
-            fileNm = odmxml.getName();
-            if (fileNm != null && fileNm.endsWith(".xml")) {
-                importXml = FileUtils.readFileToString(odmxml, "UTF-8");
-            } else {
-                logger.error("file is not an xml extension file");
-                return new ResponseEntity(ErrorConstants.ERR_FILE_FORMAT_NOT_SUPPORTED, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-            }
-        } else {
-            //  if call is from the mirth server, then may have no attached file in the request
-            // Read from request content
-            StringBuilder buffer = new StringBuilder();
-            BufferedReader reader = request.getReader();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                buffer.append(line);
-            }
-            importXml = buffer.toString();
-        }
-
-
-        Mapping myMap = new Mapping();
-        String ODM_MAPPING_DIRPath = CoreResources.ODM_MAPPING_DIR;
-        myMap.loadMapping(ODM_MAPPING_DIRPath + File.separator + "cd_odm_mapping.xml");
-
-        Unmarshaller um1 = new Unmarshaller(myMap);
-        boolean fail = false;
-        ODMContainer odmContainer = new ODMContainer();
-        InputStream inputStream = null;
-        try {
-            // unmarshal xml to java
-            inputStream = new ByteArrayInputStream(importXml.getBytes());
-            String defaultEncoding = "UTF-8";
-
-            BOMInputStream bOMInputStream = new BOMInputStream(inputStream);
-            ByteOrderMark bom = bOMInputStream.getBOM();
-            String charsetName = bom == null ? defaultEncoding : bom.getCharsetName();
-            InputStreamReader reader = new InputStreamReader(new BufferedInputStream(bOMInputStream), charsetName);
-
-            odmContainer = (ODMContainer) um1.unmarshal(reader);
-
-        } catch (Exception e) {
-            logger.error("found exception with xml transform {}", e);
-            return new ResponseEntity(ErrorConstants.ERR_INVALID_XML_FILE + "\n" + e.getMessage(), HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-        } finally {
-            inputStream.close();
-        }
-
+        String fileNm = getFlatFileImportDataHelper().getFileName(files);
         studyOID = studyOID.toUpperCase();
         Study publicStudy = studyDao.findPublicStudy(studyOID);
         if (publicStudy == null) {
@@ -797,6 +706,7 @@ public class FlatFileImportController {
             siteOid = siteOid.toUpperCase();
 
         utilService.setSchemaFromStudyOid(studyOid);
+        String schema = CoreResources.getRequestSchema();
 
         ArrayList<StudyUserRoleBean> userRoles = userAccountBean.getRoles();
 
@@ -830,11 +740,10 @@ public class FlatFileImportController {
             }
         }
 
-        String schema = CoreResources.getRequestSchema();
-
         String uuid;
         try {
-            uuid = startImportJob(odmContainer, schema, studyOid, siteOid, userAccountBean, fileNm, isSystemUserImport);
+            uuid = startImportJob(files, hm, studyOid, siteOid, userAccountBean, fileNm, schema, isSystemUserImport);
+            //uuid = startImportJob(odmContainer, schema, studyOid, siteOid, userAccountBean, fileNm, isSystemUserImport);
             String msg = validation_passed_message;
             ArrayList<String> detailMessages = new ArrayList();
             detailMessages.add("Please see bulk action logs. Job uuid: " + uuid);
@@ -846,8 +755,8 @@ public class FlatFileImportController {
         }
     }
 
-    public String startImportJob(ODMContainer odmContainer, String schema, String studyOid, String siteOid,
-                                 UserAccountBean userAccountBean, String fileNm, boolean isSystemUserImport) {
+    public String startImportJob(List<File> files, HashMap hm, String studyOid, String siteOid,
+                                 UserAccountBean userAccountBean, String fileNm, String schema, boolean isSystemUserImport) {
         utilService.setSchemaFromStudyOid(studyOid);
 
         Study site = studyDao.findByOcOID(siteOid);
@@ -856,10 +765,9 @@ public class FlatFileImportController {
         if (isSystemUserImport) {
             // For system level imports, instead of running import as an asynchronous job, run it synchronously
             logger.debug("Running import synchronously");
-            boolean isImportSuccessful = importService.validateAndProcessFlatFileDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, null, isSystemUserImport);
-
-            if (!isImportSuccessful) {
-                // Throw an error if import fails such that randomize service can update the status accordingly
+            try {
+                importService.validateAndProcessFlatFileDataImport(files, hm, studyOid, siteOid, userAccountBean, isSystemUserImport, null, schema);
+            } catch (Exception e) {
                 throw new CustomParameterizedException(ErrorConstants.ERR_IMPORT_FAILED);
             }
             return null;
@@ -867,7 +775,8 @@ public class FlatFileImportController {
             JobDetail jobDetail = userService.persistJobCreated(study, site, userAccount, JobType.FLAT_FILE_IMPORT, fileNm);
             CompletableFuture<Object> future = CompletableFuture.supplyAsync(() -> {
                 try {
-                    importService.validateAndProcessFlatFileDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport);
+                    importService.validateAndProcessFlatFileDataImport(files, hm, studyOid, siteOid, userAccountBean, isSystemUserImport, jobDetail, schema);
+                    //importService.validateAndProcessFlatFileDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport);
                 } catch (Exception e) {
                     logger.error("Exception is thrown while processing dataImport: " + e);
                     userService.persistJobFailed(jobDetail, fileNm);
@@ -878,113 +787,4 @@ public class FlatFileImportController {
             return jobDetail.getUuid();
         }
     }
-
-    public File makeOdmXmlFile(List<File> files, HashMap hm, String studyOID) throws Exception {
-        /**
-         *  prepare mapping file
-         */
-        File mappingFile = null;
-        for (File file : files) {
-            if (file.getName().toLowerCase().endsWith(".properties")) {
-                mappingFile = file;
-                Study publicStudy = null;
-                if (!StringUtils.isEmpty(studyOID))
-                    publicStudy = studyDao.findPublicStudy(studyOID);
-                if (publicStudy != null)
-                    CoreResources.setRequestSchema(publicStudy.getSchemaName());
-                break;
-            }
-        }
-
-        for (File file : files) {
-            // skip mapping file
-            if (file.getName().toLowerCase().endsWith(".properties")) {
-            } else {
-                File dataFile = processData(mappingFile, file, studyOID);
-                String originalFileName = dataFile.getName();
-                String dataStr = this.getImportDataHelper().transformTextToODMxml(mappingFile, dataFile, hm);
-                return this.getImportDataHelper().saveDataToFile(dataStr, originalFileName, studyOID);
-            }
-        }
-        return null;
-    }
-
-    public File processData(File mappingFile, File dataFile, String studyOID) throws IOException, OpenClinicaException {
-        String importFileDir = this.getImportDataHelper().getImportFileDir(studyOID);
-        String fileType = com.google.common.io.Files.getFileExtension(dataFile.getAbsolutePath());
-        if (fileType.equals(SAS_FILE_EXTENSION)) {
-            // convert sas to pipe-delimited
-            dataFile = sasFileConverterService.convert(dataFile);
-        } else if (fileType.equals(XLSX_FILE_EXTENSION)) {
-            // convert xlsx to pipe-delimited
-            dataFile = excelFileConverterService.convert(dataFile);
-        } else if (fileType.equals(CSV_FILE_EXTENSION)) {
-            // convert csv to pipe-delimited
-            dataFile = csvFileConverterService.convert(dataFile);
-        } else if (fileType.equals(TXT_FILE_EXTENSION)) {
-            Properties mappingProperties = readMappingProperties(mappingFile);
-            String delimiter = mappingProperties.getProperty(PipeDelimitedDataHelper.DELIMITER_PROPERTY);
-            if (delimiter != null) {
-                if (delimiter.length() != 1) {
-                    throw new OpenClinicaException("Invalid delimiter character", ErrorConstants.INVALID_DELIMITER);
-                }
-                dataFile = csvFileConverterService.convert(dataFile, delimiter.charAt(0));
-            }
-        }
-
-        BufferedReader reader = new BufferedReader(new FileReader(dataFile));
-
-        //get original file name
-        String orginalFileName = dataFile.getName();
-        int pos = orginalFileName.indexOf(".");
-        if (pos > 0) {
-            orginalFileName = orginalFileName.substring(0, pos);
-        }
-
-        //first line
-        String columnLine = reader.readLine();
-        String line = columnLine;
-
-        File oneFile = new File(importFileDir + orginalFileName + ".txt");
-        FileOutputStream fos = new FileOutputStream(oneFile);
-        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
-        bw.write(columnLine);
-
-        try {
-            while (line != null) {
-                // read next line
-                line = reader.readLine();
-                if (line != null) {
-                    bw.write("\r");
-                    bw.write(line);
-                }
-
-            }
-            if (bw != null) {
-                bw.close();
-            }
-            reader.close();
-
-        } catch (Exception e) {
-            logger.error("Error while accessing the process the data: ", e);
-        }
-
-        return oneFile;
-    }
-
-
-    public PipeDelimitedDataHelper getImportDataHelper() {
-        if (importDataHelper == null) {
-            importDataHelper = new PipeDelimitedDataHelper(this.dataSource, studyBuildService, studyDao);
-        }
-        return importDataHelper;
-    }
-
-
-    private Properties readMappingProperties(File mappingFile) throws IOException {
-        Properties mappingProperties = new Properties();
-        mappingProperties.load(new FileReader(mappingFile));
-        return mappingProperties;
-    }
-
 }

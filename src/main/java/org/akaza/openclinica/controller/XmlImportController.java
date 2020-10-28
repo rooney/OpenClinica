@@ -1,6 +1,7 @@
 package org.akaza.openclinica.controller;
 
 import core.org.akaza.openclinica.bean.login.*;
+import core.org.akaza.openclinica.logic.importdata.ImportDataHelper;
 import core.org.akaza.openclinica.service.CustomParameterizedException;
 import core.org.akaza.openclinica.service.DataImportService;
 import core.org.akaza.openclinica.service.UtilService;
@@ -91,7 +92,7 @@ public class XmlImportController {
         if (file != null) {
             fileNm = file.getOriginalFilename();
             if (fileNm != null && fileNm.endsWith(".xml")) {
-                importXml = RestfulServiceHelper.readFileToString(file);
+                importXml = ImportDataHelper.readFileToString(file);
             } else {
                 logger.error("file is not an xml extension file");
                 return new ResponseEntity(ErrorConstants.ERR_FILE_FORMAT_NOT_SUPPORTED, HttpStatus.UNSUPPORTED_MEDIA_TYPE);

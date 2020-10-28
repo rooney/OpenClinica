@@ -1,57 +1,44 @@
 package org.akaza.openclinica.control.submit;
 
 import core.org.akaza.openclinica.bean.core.Role;
+import core.org.akaza.openclinica.bean.login.StudyUserRoleBean;
 import core.org.akaza.openclinica.bean.login.UserAccountBean;
 import core.org.akaza.openclinica.bean.rule.FileUploadHelper;
-import core.org.akaza.openclinica.bean.rule.XmlSchemaValidationHelper;
 import core.org.akaza.openclinica.core.SessionManager;
 import core.org.akaza.openclinica.core.form.StringUtil;
 import core.org.akaza.openclinica.dao.core.CoreResources;
-import core.org.akaza.openclinica.dao.hibernate.StudyDao;
 import core.org.akaza.openclinica.dao.hibernate.UserAccountDao;
-import core.org.akaza.openclinica.dao.login.UserAccountDAO;
+import core.org.akaza.openclinica.domain.datamap.JobDetail;
+import core.org.akaza.openclinica.domain.datamap.Study;
+import core.org.akaza.openclinica.domain.enumsupport.JobType;
+import core.org.akaza.openclinica.domain.user.UserAccount;
 import core.org.akaza.openclinica.i18n.core.LocaleResolver;
+import core.org.akaza.openclinica.logic.importdata.FlatFileImportDataHelper;
+import core.org.akaza.openclinica.service.CustomParameterizedException;
 import core.org.akaza.openclinica.web.InsufficientPermissionException;
 import core.org.akaza.openclinica.web.SQLInitServlet;
 import org.akaza.openclinica.control.SpringServletAccess;
 import org.akaza.openclinica.control.core.SecureController;
 import org.akaza.openclinica.control.form.FormProcessor;
-import org.akaza.openclinica.controller.FlatFileImportController;
-import org.akaza.openclinica.controller.helper.RestfulServiceHelper;
-import org.akaza.openclinica.service.CsvFileConverterServiceImpl;
-import org.akaza.openclinica.service.ExcelFileConverterServiceImpl;
 import org.akaza.openclinica.service.ImportService;
-import org.akaza.openclinica.service.SasFileConverterServiceImpl;
 import org.akaza.openclinica.view.Page;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.mime.HttpMultipartMode;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.entity.mime.content.FileBody;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.springframework.mock.web.MockHttpServletRequest;
+import org.akaza.openclinica.web.restful.errors.ErrorConstants;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.http.HttpServletRequest;
 import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
 
 
 public class UploadCRFDataToHttpServerServlet extends SecureController {
 
     Locale locale;
     private FileUploadHelper uploadHelper = new FileUploadHelper();
-    private RestfulServiceHelper restfulServiceHelper;
-    private FlatFileImportController flatFileImportController;
+    private FlatFileImportDataHelper flatFileImportDataHelper;
 
 
     /**
@@ -160,7 +147,7 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
                     return;
                 } else {
                     try {
-                        hm = this.getRestfulServiceHelper().getImportDataHelper().validateMappingFile(mappingFile);
+                        hm = this.getFlatFileImportDataHelper().validateMappingFile(mappingFile);
                     } catch (Exception e) {
                         String message = e.getMessage();
                         this.addPageMessage(message);
@@ -175,7 +162,7 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
                 String studyOid = null;
                 for (File file : files) {
                     if (file.getName().toLowerCase().endsWith(".properties")) {
-                        studyOid = this.getRestfulServiceHelper().getImportDataHelper().getStudyOidFromMappingFile(file);
+                        studyOid = this.getFlatFileImportDataHelper().getStudyOidFromMappingFile(file);
                         break;
                     }
 
@@ -188,19 +175,12 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
                 //////////////// Start of heavy thread run/////////////////////
                 final HashMap hmIn = hm;
                 UserAccountBean userAccountBean = getUtilService().getUserAccountFromRequest(request);
-                new Thread(new Runnable() {
-                    public void run() {
-                        try {
-                            getFlatFileImportController().processDataAndStartImportJob(request, files, hmIn, studyOID, userAccountBean);
-                        } catch (Exception e) {
-                            logger.error("Error sending data row for request: ", e);
-                        }
-                        ;
-                    }
-                }).start();
 
-                ///////////////// end of heavy thread run/////////////////////
-
+                try {
+                    validateStudyOidRolesAndStartImportJob(request, files, hmIn, studyOID, userAccountBean);
+                } catch (Exception e) {
+                    logger.error("Error sending data row for request: ", e);
+                }
                 return;
 
 
@@ -218,14 +198,14 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
             String studyID = request.getParameter("studyId");
             String parentNm = request.getParameter("parentNm");
             String fileName = request.getParameter("fileId");
-            File file = this.getRestfulServiceHelper().getImportDataHelper().getImportFileByStudyIDParentNm(studyID, parentNm, fileName);
+            File file = this.getFlatFileImportDataHelper().getImportFileByStudyIDParentNm(studyID, parentNm, fileName);
             dowloadFile(file, "text/csv");
 
         } else if ("delete".equalsIgnoreCase(action)) {
             String studyID = request.getParameter("studyId");
             String parentNm = request.getParameter("parentNm");
             String fileName = request.getParameter("fileId");
-            File tempFile = this.getRestfulServiceHelper().getImportDataHelper().getImportFileByStudyIDParentNm(studyID, parentNm, fileName);
+            File tempFile = this.getFlatFileImportDataHelper().getImportFileByStudyIDParentNm(studyID, parentNm, fileName);
 
             if (tempFile != null && tempFile.exists()) {
                 tempFile.delete();
@@ -241,10 +221,109 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
                 RequestDispatcher dis = request.getRequestDispatcher("/pages/Log/listFiles");
                 dis.forward(request, response);
             }
+        }
+    }
+
+    public ResponseEntity<Object> validateStudyOidRolesAndStartImportJob(HttpServletRequest request, List<File> files, HashMap hm,
+                                                                         String studyOID, UserAccountBean userAccountBean) {
+        String fileNm = getFlatFileImportDataHelper().getFileName(files);
+        studyOID = studyOID.toUpperCase();
+        Study publicStudy = getStudyDao().findPublicStudy(studyOID);
+        if (publicStudy == null) {
+            return new ResponseEntity(ErrorConstants.ERR_STUDY_NOT_EXIST, HttpStatus.NOT_FOUND);
+        }
+        String siteOid = null;
+        String studyOid = null;
+
+        if (publicStudy.getStudy() == null) {
+            // This is a studyOid
+            studyOid = studyOID;
+        } else {
+            //This is a siteOid
+            siteOid = studyOID;
+            studyOid = publicStudy.getStudy().getOc_oid();
 
         }
+        if (studyOid != null)
+            studyOid = studyOid.toUpperCase();
+        if (siteOid != null)
+            siteOid = siteOid.toUpperCase();
 
+        getUtilService().setSchemaFromStudyOid(studyOid);
+        String schema = CoreResources.getRequestSchema();
 
+        ArrayList<StudyUserRoleBean> userRoles = userAccountBean.getRoles();
+
+        if (!getValidateService().isStudyAvailable(studyOid)) {
+            return new ResponseEntity(ErrorConstants.ERR_STUDY_NOT_AVAILABLE, HttpStatus.OK);
+        }
+
+        if (siteOid != null && !getValidateService().isSiteAvailable(siteOid)) {
+            return new ResponseEntity(ErrorConstants.ERR_SITE_NOT_AVAILABLE, HttpStatus.OK);
+        }
+
+        if (!getValidateService().isStudyOidValid(studyOid)) {
+            return new ResponseEntity(ErrorConstants.ERR_STUDY_NOT_EXIST, HttpStatus.OK);
+        }
+
+        // If the import is performed by a system user, then we can skip the roles check.
+        boolean isSystemUserImport = getValidateService().isUserSystemUser(request);
+        if (!isSystemUserImport) {
+            if (siteOid != null) {
+                if (!getValidateService().isUserHasAccessToSite(userRoles, siteOid)) {
+                    return new ResponseEntity(ErrorConstants.ERR_NO_ROLE_SETUP, HttpStatus.OK);
+                } else if (!getValidateService().isUserHas_CRC_INV_DM_DEP_DS_RoleInSite(userRoles, siteOid)) {
+                    return new ResponseEntity(ErrorConstants.ERR_NO_SUFFICIENT_PRIVILEGES, HttpStatus.OK);
+                }
+            } else {
+                if (!getValidateService().isUserHasAccessToStudy(userRoles, studyOid)) {
+                    return new ResponseEntity(ErrorConstants.ERR_NO_ROLE_SETUP, HttpStatus.OK);
+                } else if (!getValidateService().isUserHas_DM_DEP_DS_RoleInStudy(userRoles, studyOid)) {
+                    return new ResponseEntity(ErrorConstants.ERR_NO_SUFFICIENT_PRIVILEGES, HttpStatus.OK);
+                }
+            }
+        }
+
+        String uuid;
+        try {
+            uuid = startImportJob(files, hm, studyOid, siteOid, userAccountBean, fileNm, schema, isSystemUserImport);
+            return new ResponseEntity("Job uuid: " + uuid, org.springframework.http.HttpStatus.OK);
+        } catch (CustomParameterizedException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    public String startImportJob(List<File> files, HashMap hm, String studyOid, String siteOid,
+                                 UserAccountBean userAccountBean, String fileNm, String schema, boolean isSystemUserImport) {
+        getUtilService().setSchemaFromStudyOid(studyOid);
+
+        Study site = getStudyDao().findByOcOID(siteOid);
+        Study study = getStudyDao().findByOcOID(studyOid);
+        UserAccount userAccount = getUserAccountDao().findById(userAccountBean.getId());
+        if (isSystemUserImport) {
+            // For system level imports, instead of running import as an asynchronous job, run it synchronously
+            logger.debug("Running import synchronously");
+            try {
+                getImportService().validateAndProcessFlatFileDataImport(files, hm, studyOid, siteOid, userAccountBean, isSystemUserImport, null, schema);
+            } catch (Exception e) {
+                throw new CustomParameterizedException(ErrorConstants.ERR_IMPORT_FAILED);
+            }
+            return null;
+        } else {
+            JobDetail jobDetail = getUserService().persistJobCreated(study, site, userAccount, JobType.FLAT_FILE_IMPORT, fileNm);
+            CompletableFuture<Object> future = CompletableFuture.supplyAsync(() -> {
+                try {
+                    getImportService().validateAndProcessFlatFileDataImport(files, hm, studyOid, siteOid, userAccountBean, isSystemUserImport, jobDetail, schema);
+                    //importService.validateAndProcessFlatFileDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport);
+                } catch (Exception e) {
+                    logger.error("Exception is thrown while processing dataImport: " + e);
+                    getUserService().persistJobFailed(jobDetail, fileNm);
+                }
+                return null;
+
+            });
+            return jobDetail.getUuid();
+        }
     }
 
     /**
@@ -262,7 +341,6 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
 
     private List<File> getUploadedFiles() {
         File f = null;
-        boolean foundMappingFile = false;
 
         List<File> files = uploadHelper.returnFiles(request, context);
         for (File file : files) {
@@ -272,9 +350,7 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
 
             } else {
                 if (f.getName().equals("mapping.txt")) {
-                    foundMappingFile = true;
                     logger.info("Found mapping.txt uploaded");
-
                     break;
                 }
             }
@@ -297,23 +373,11 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
         }
     }
 
-    public RestfulServiceHelper getRestfulServiceHelper() {
-        if (restfulServiceHelper == null) {
-            restfulServiceHelper = new RestfulServiceHelper(this.getSM().getDataSource(), getStudyBuildService(), getStudyDao(), getSasFileConverterService(), getExcelFileConverterService(), getCsvFileConverterService());
+    public FlatFileImportDataHelper getFlatFileImportDataHelper() {
+        if (flatFileImportDataHelper == null) {
+            flatFileImportDataHelper = new FlatFileImportDataHelper(this.getSM().getDataSource(), getStudyBuildService(), getStudyDao());
         }
-        return restfulServiceHelper;
-    }
-
-    protected SasFileConverterServiceImpl getSasFileConverterService() {
-        return (SasFileConverterServiceImpl) SpringServletAccess.getApplicationContext(context).getBean("sasFileConverterService");
-    }
-
-    protected ExcelFileConverterServiceImpl getExcelFileConverterService() {
-        return (ExcelFileConverterServiceImpl) SpringServletAccess.getApplicationContext(context).getBean("excelFileConverterService");
-    }
-
-    protected CsvFileConverterServiceImpl getCsvFileConverterService() {
-        return (CsvFileConverterServiceImpl) SpringServletAccess.getApplicationContext(context).getBean("csvFileConverterService");
+        return flatFileImportDataHelper;
     }
 
     protected UserAccountDao getUserAccountDao() {
@@ -322,18 +386,6 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
 
     protected ImportService getImportService() {
         return (ImportService) SpringServletAccess.getApplicationContext(context).getBean("importService");
-    }
-
-    public FlatFileImportController getFlatFileImportController() {
-        if (flatFileImportController == null) {
-            flatFileImportController = new FlatFileImportController(getStudyDao(), getUserAccountDao(), getValidateService(), getUtilService(), getImportService(), getUserService(),
-                    getSasFileConverterService(), getExcelFileConverterService(), getCsvFileConverterService(), this.getSM().getDataSource());
-        }
-        return flatFileImportController;
-    }
-
-    public void setRestfulServiceHelper(RestfulServiceHelper restfulServiceHelper) {
-        this.restfulServiceHelper = restfulServiceHelper;
     }
 
     public SessionManager getSM() {

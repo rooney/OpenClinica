@@ -24,7 +24,7 @@ import core.org.akaza.openclinica.domain.datamap.Study;
 import core.org.akaza.openclinica.domain.user.UserAccount;
 import core.org.akaza.openclinica.exception.OpenClinicaException;
 import core.org.akaza.openclinica.i18n.util.ResourceBundleProvider;
-import core.org.akaza.openclinica.logic.importdata.PipeDelimitedDataHelper;
+import core.org.akaza.openclinica.logic.importdata.FlatFileImportDataHelper;
 import core.org.akaza.openclinica.service.StudyBuildService;
 import org.akaza.openclinica.control.form.DiscrepancyValidator;
 import org.akaza.openclinica.control.form.FormDiscrepancyNotes;
@@ -57,7 +57,7 @@ public class ImportCRFDataService {
     private final DataSource ds;
     private ItemDataDAO itemDataDao;
     private String skipMatchCriteriaSql;
-    private PipeDelimitedDataHelper pipeDelimitedDataHelper;
+    private FlatFileImportDataHelper flatFileImportDataHelper;
     private RestfulServiceHelper restfulServiceHelper;
 
     @Autowired
@@ -2414,15 +2414,15 @@ public class ImportCRFDataService {
 		this.skipMatchCriteriaSql = skipMatchCriteriaSql;
 	}
 
-	public PipeDelimitedDataHelper getPipeDelimitedDataHelper() {
-		if(pipeDelimitedDataHelper == null) {
-			pipeDelimitedDataHelper = new PipeDelimitedDataHelper(this.ds, studyBuildService, studyDao);
+	public FlatFileImportDataHelper getFlatFileImportDataHelper() {
+		if(flatFileImportDataHelper == null) {
+			flatFileImportDataHelper = new FlatFileImportDataHelper(this.ds, studyBuildService, studyDao);
 		}
-		return pipeDelimitedDataHelper;
+		return flatFileImportDataHelper;
 	}
 
-	public void setPipeDelimitedDataHelper(PipeDelimitedDataHelper importDataHelper) {
-		this.pipeDelimitedDataHelper = importDataHelper;
+	public void setFlatFileImportDataHelper(FlatFileImportDataHelper importDataHelper) {
+		this.flatFileImportDataHelper = importDataHelper;
 	}
 
 	public RestfulServiceHelper getRestfulServiceHelper() {
@@ -2444,7 +2444,7 @@ public class ImportCRFDataService {
 
         String studyOid = odmContainer.getCrfDataPostImportContainer().getStudyOID();
         Study studyBean = studyDao.findByOcOID(studyOid);
-        UserAccountBean userBean = this.getPipeDelimitedDataHelper().getUserAccount(request);
+        UserAccountBean userBean = this.getFlatFileImportDataHelper().getUserAccount(request);
         String userName=  userBean.getName();
 
         String msg = this.getRestfulServiceHelper().verifyRole(userName, studyOid, null);

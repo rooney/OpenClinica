@@ -9,7 +9,7 @@ import core.org.akaza.openclinica.dao.login.UserAccountDAO;
 import core.org.akaza.openclinica.domain.datamap.Study;
 import core.org.akaza.openclinica.exception.OpenClinicaException;
 import core.org.akaza.openclinica.exception.OpenClinicaSystemException;
-import core.org.akaza.openclinica.logic.importdata.PipeDelimitedDataHelper;
+import core.org.akaza.openclinica.logic.importdata.FlatFileImportDataHelper;
 import core.org.akaza.openclinica.service.StudyBuildService;
 import org.akaza.openclinica.control.SpringServletAccess;
 import org.akaza.openclinica.service.CsvFileConverterServiceImpl;
@@ -55,7 +55,7 @@ public class RestfulServiceHelper {
     private StudyDao studyDao;
     private StudyBuildService studyBuildService;
     private UserAccountDAO userAccountDAO;
-    private PipeDelimitedDataHelper importDataHelper;
+    private FlatFileImportDataHelper importDataHelper;
     private MessageLogger messageLogger;
     private SasFileConverterServiceImpl sasFileConverterService;
     private ExcelFileConverterServiceImpl excelFileConverterService;
@@ -110,27 +110,6 @@ public class RestfulServiceHelper {
 
         return study;
     }
-
-    /**
-     * @param file
-     * @return
-     * @throws IOException
-     */
-    public static String readFileToString(MultipartFile file) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        try (Scanner sc = new Scanner(file.getInputStream())) {
-            String currentLine;
-
-            while (sc.hasNextLine()) {
-                currentLine = sc.nextLine();
-                sb.append(currentLine);
-            }
-
-        }
-
-        return sb.toString();
-    }
-
 
     public boolean verifyRole(String userName, String study_oid,
                               String site_oid, Errors e) {
@@ -243,288 +222,18 @@ public class RestfulServiceHelper {
 
     }
 
-
-    public File getXSDFile(HttpServletRequest request, String fileNm) {
-        HttpSession session = request.getSession();
-        ServletContext context = session.getServletContext();
-
-        return new File(SpringServletAccess.getPropertiesDir(context) + fileNm);
-    }
-
     public UserAccountDAO getUserAccountDAO() {
         userAccountDAO = userAccountDAO != null ? userAccountDAO : new UserAccountDAO(dataSource);
         return userAccountDAO;
     }
 
-//    /**
-//     * this will call OC Restful API directly:
-//     * ${remoteAddress}/OpenClinica/pages/auth/api/clinicaldata/
-//     * @param files
-//     * @param request
-//     * @return
-//     * @throws Exception
-//     */
-//    public ImportCRFInfoSummary sendOneDataRowPerRequestByHttpClient(List<File> files, HttpServletRequest request, HashMap hm) throws Exception {
-//        String remoteAddress = this.getBasePath(request);
-//        String importDataWSUrl = remoteAddress + "/OpenClinica/pages/auth/api/clinicaldata/import";
-//        ImportCRFInfoSummary importCRFInfoSummary = new ImportCRFInfoSummary();
-//        String studyOID = null;
-//
-//        /**
-//         *  prepare mapping file
-//         */
-//        File mappingFile = null;
-//        for (File file : files) {
-//
-//            if (file.getName().toLowerCase().endsWith(".properties")) {
-//                mappingFile = file;
-//                studyOID = this.getImportDataHelper().getStudyOidFromMappingFile(file);
-//                Study publicStudy = null;
-//                if (StringUtils.isEmpty(studyOID))
-//                    publicStudy = studyDao.findPublicStudy(studyOID);
-//                if (publicStudy != null)
-//                    CoreResources.setRequestSchema(publicStudy.getSchemaName());
-//                break;
-//            }
-//
-//        }
-//
-//
-//        int i = 1;
-//        for (File file : files) {
-//            // skip mapping file
-//            if (file.getName().toLowerCase().endsWith(".properties")) {
-//            } else {
-//                File dataFile = processData(mappingFile, file, studyOID);
-//
-//                try {
-//                    /**
-//                     *  add header Authorization
-//                     */
-//                    HttpPost post = new HttpPost(importDataWSUrl);
-//                    String accessToken = (String) request.getSession().getAttribute("accessToken");
-//                    post.setHeader("Authorization", "Bearer " + accessToken);
-//
-//                    String basePath = getBasePath(request);
-//                    post.setHeader("OCBasePath", basePath);
-//                    post.setHeader("PIPETEXT", "PIPETEXT");
-//
-////                    //SkipMatchCriteria
-////                    String skipMatchCriteria = this.getImportDataHelper().getSkipMatchCriteria(dataFile, mappingFile);
-////                    post.setHeader("SkipMatchCriteria", skipMatchCriteria);
-//
-//                    post.setHeader("Accept",
-//                            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-//                    post.setHeader("Accept-Language", "en-US,en;q=0.5");
-//                    post.setHeader("Connection", "keep-alive");
-//
-//                    String originalFileName = dataFile.getName();
-//
-//                    MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-//                    builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
-//                    String partNm = null;
-//                    /**
-//                     *  Here will only send ODM XML to OC API
-//                     *
-//                     */
-//                    String dataStr = this.getImportDataHelper().transformTextToODMxml(mappingFile, dataFile, hm);
-//                    File odmXmlFile = this.getImportDataHelper().saveDataToFile(dataStr, originalFileName, studyOID);
-//
-//                    FileBody fileBody = new FileBody(odmXmlFile, ContentType.TEXT_PLAIN);
-//                    partNm = "uploadedData" + i;
-//                    builder.addPart(partNm, fileBody);
-//                    builder.addBinaryBody("file", odmXmlFile);
-//
-//
-//                    HttpEntity entity = builder.build();
-//                    post.setEntity(entity);
-//
-//                    CloseableHttpClient httpClient = HttpClients.createDefault();
-//                    HttpResponse response = httpClient.execute(post);
-//
-//                } catch (OpenClinicaSystemException e) {
-//
-//                }
-//                // after sent, then delete from disk
-//                this.getImportDataHelper().deleteTempImportFile(dataFile, studyOID);
-//
-//            }
-//        }
-//        // not save original data
-//        //this.getImportDataHelper().saveFileToImportFolder(files,studyOID);
-//
-//        return importCRFInfoSummary;
-//    }
-//
-//    public ImportCRFInfoSummary sendDataByHttpClient(List<File> files, MockHttpServletRequest request, boolean ismock, HashMap hm) throws Exception {
-//
-//        String importDataWSUrl = (String) request.getAttribute("importDataWSUrl");
-//        String accessToken = (String) request.getAttribute("accessToken");
-//        String basePath = (String) request.getAttribute("basePath");
-//
-//        ImportCRFInfoSummary importCRFInfoSummary = new ImportCRFInfoSummary();
-//        String studyOID = null;
-//
-//        /**
-//         *  prepare mapping file
-//         */
-//        File mappingFile = null;
-//        for (File file : files) {
-//            if (file.getName().toLowerCase().endsWith(".properties")) {
-//                mappingFile = file;
-//                studyOID = this.getImportDataHelper().getStudyOidFromMappingFile(file);
-//                Study publicStudy = null;
-//                if (!StringUtils.isEmpty(studyOID))
-//                    publicStudy = studyDao.findPublicStudy(studyOID);
-//                if (publicStudy != null)
-//                    CoreResources.setRequestSchema(publicStudy.getSchemaName());
-//                break;
-//            }
-//        }
-//
-//        int i = 1;
-//        for (File file : files) {
-//            // skip mapping file
-//            if (file.getName().toLowerCase().endsWith(".properties")) {
-//            } else {
-//                File dataFile = processData(mappingFile, file, studyOID);
-//                try {
-//                    /**
-//                     *  add header Authorization
-//                     */
-//                    HttpPost post = new HttpPost(importDataWSUrl);
-//                    post.setHeader("Authorization", "Bearer " + accessToken);
-//                    post.setHeader("OCBasePath", basePath);
-//                    post.setHeader("PIPETEXT", "PIPETEXT");
-//                    post.setHeader("Accept",
-//                            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-//                    post.setHeader("Accept-Language", "en-US,en;q=0.5");
-//                    post.setHeader("Connection", "keep-alive");
-//
-//                    String originalFileName = dataFile.getName();
-//                    MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-//                    builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
-//
-//                    /**
-//                     *  Here will only send ODM XML to OC API
-//                     */
-//                    String dataStr = this.getImportDataHelper().transformTextToODMxml(mappingFile, dataFile, hm);
-//                    File odmXmlFile = this.getImportDataHelper().saveDataToFile(dataStr, originalFileName, studyOID);
-//
-//                    FileBody fileBody = new FileBody(odmXmlFile, ContentType.TEXT_PLAIN);
-//                    builder.addPart("uploadedData", fileBody);
-//                    builder.addBinaryBody("file", odmXmlFile);
-//
-//
-//                    HttpEntity entity = builder.build();
-//                    post.setEntity(entity);
-//
-//                    CloseableHttpClient httpClient = HttpClients.createDefault();
-//                    httpClient.execute(post);
-//
-//
-//                } catch (OpenClinicaSystemException e) {
-//
-//                }
-//                // after sent, then delete from disk
-//                this.getImportDataHelper().deleteTempImportFile(dataFile, studyOID);
-//
-//            }
-//        }
-//
-//        return importCRFInfoSummary;
-//    }
-//
-//    public File processData(File mappingFile, File dataFile, String studyOID) throws IOException, OpenClinicaException {
-//        String importFileDir = this.getImportDataHelper().getImportFileDir(studyOID);
-//        String fileType = Files.getFileExtension(dataFile.getAbsolutePath());
-//        if (fileType.equals(SAS_FILE_EXTENSION)) {
-//            // convert sas to pipe-delimited
-//            dataFile = sasFileConverterService.convert(dataFile);
-//        } else if (fileType.equals(XLSX_FILE_EXTENSION)) {
-//            // convert xlsx to pipe-delimited
-//            dataFile = excelFileConverterService.convert(dataFile);
-//        } else if (fileType.equals(CSV_FILE_EXTENSION)) {
-//            // convert csv to pipe-delimited
-//            dataFile = csvFileConverterService.convert(dataFile);
-//        } else if (fileType.equals(TXT_FILE_EXTENSION)) {
-//            Properties mappingProperties = readMappingProperties(mappingFile);
-//            String delimiter = mappingProperties.getProperty(PipeDelimitedDataHelper.DELIMITER_PROPERTY);
-//            if (delimiter != null) {
-//                if (delimiter.length() != 1) {
-//                    throw new OpenClinicaException("Invalid delimiter character", ErrorConstants.INVALID_DELIMITER);
-//                }
-//                dataFile = csvFileConverterService.convert(dataFile, delimiter.charAt(0));
-//            }
-//        }
-//
-//        BufferedReader reader = new BufferedReader(new FileReader(dataFile));
-//
-//        //get original file name
-//        String orginalFileName = dataFile.getName();
-//        int pos = orginalFileName.indexOf(".");
-//        if (pos > 0) {
-//            orginalFileName = orginalFileName.substring(0, pos);
-//        }
-//
-//        //first line
-//        String columnLine = reader.readLine();
-//        String line = columnLine;
-//
-//        File oneFile = new File(importFileDir + orginalFileName + ".txt");
-//        FileOutputStream fos = new FileOutputStream(oneFile);
-//        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
-//        bw.write(columnLine);
-//
-//        try {
-//            while (line != null) {
-//                // read next line
-//                line = reader.readLine();
-//                if (line != null) {
-//                    bw.write("\r");
-//                    bw.write(line);
-//                }
-//
-//            }
-//            if (bw != null) {
-//                bw.close();
-//            }
-//            reader.close();
-//
-//        } catch (Exception e) {
-//            log.error("Error while accessing the process the data: ", e);
-//        }
-//
-//        return oneFile;
-//    }
-//
-//    public static String getBasePath(HttpServletRequest request) {
-//        StringBuffer basePath = new StringBuffer();
-//        String scheme = request.getScheme();
-//        String domain = request.getServerName();
-//        int port = request.getServerPort();
-//        basePath.append(scheme);
-//        basePath.append("://");
-//        basePath.append(domain);
-//        if ("http".equalsIgnoreCase(scheme) && 80 != port) {
-//            basePath.append(":").append(String.valueOf(port));
-//        } else if ("https".equalsIgnoreCase(scheme) && port != 443) {
-//            basePath.append(":").append(String.valueOf(port));
-//        }
-//        return basePath.toString();
-//    }
 
-
-    public PipeDelimitedDataHelper getImportDataHelper() {
+    public FlatFileImportDataHelper getImportDataHelper() {
         if (importDataHelper == null) {
-            importDataHelper = new PipeDelimitedDataHelper(this.dataSource, studyBuildService, studyDao);
+            importDataHelper = new FlatFileImportDataHelper(this.dataSource, studyBuildService, studyDao);
         }
         return importDataHelper;
     }
-
-//    public void setImportDataHelper(PipeDelimitedDataHelper importDataHelper) {
-//        this.importDataHelper = importDataHelper;
-//    }
 
     /**
      * @param dateTimeStr: yyyy-MM-dd
@@ -547,51 +256,4 @@ public class RestfulServiceHelper {
         return result;
     }
 
-//
-//    public MessageLogger getMessageLogger() {
-//
-//        if (messageLogger == null) {
-//            messageLogger = new MessageLogger(this.dataSource);
-//        }
-//
-//        return messageLogger;
-//    }
-//
-//
-//    public void setMessageLogger(MessageLogger messageLogger) {
-//        this.messageLogger = messageLogger;
-//    }
-//
-//    /**
-//     * @param originalFileName
-//     * @return logFileName
-//     */
-//    public String buildLogFile(String originalFileName, HttpServletRequest request) {
-//        String logFileName = null;
-//        if (originalFileName != null) {
-//            originalFileName = Files.getNameWithoutExtension(originalFileName);
-//        }
-//
-//        Date now = new Date();
-//        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd-hhmmssSSSZ");
-//        String timeStamp = simpleDateFormat.format(now);
-//        logFileName = originalFileName + "_" + timeStamp + "_log.csv";
-//        try {
-//            String importFileDir = this.getImportDataHelper().getPersonalImportFileDir(request);
-//            String logFileloc = importFileDir + logFileName;
-//            File logFile = new File(logFileloc);
-//            if (!logFile.exists()) {
-//                logFile.createNewFile();
-//            }
-//        } catch (IOException e) {
-//            log.error("Log file is not able to be created from pipe-delimited");
-//        }
-//        return logFileName;
-//    }
-//
-//    private Properties readMappingProperties(File mappingFile) throws IOException {
-//        Properties mappingProperties = new Properties();
-//        mappingProperties.load(new FileReader(mappingFile));
-//        return mappingProperties;
-//    }
 }

@@ -13,22 +13,27 @@ import core.org.akaza.openclinica.domain.enumsupport.JobType;
 import core.org.akaza.openclinica.domain.user.UserAccount;
 import core.org.akaza.openclinica.service.crfdata.ErrorObj;
 
+import java.io.File;
+import java.util.HashMap;
 import java.util.List;
 
 /**
  * @author joekeremian
- *
  */
 
 public interface ImportService {
 
     boolean validateAndProcessXMLDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
-                                         UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-                                         boolean isSystemUserImport);
+                                            UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+                                            boolean isSystemUserImport);
 
-    boolean validateAndProcessFlatFileDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
-                                         UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-                                         boolean isSystemUserImport);
+    boolean validateAndProcessFlatFileDataImport(List<File> files, HashMap hm, String studyOID, String siteOid,
+                                                 UserAccountBean userAccountBean, boolean isSystemUserImport,
+                                                 JobDetail jobDetail, String schema) throws Exception;
+
+//    boolean validateAndProcessFlatFileDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
+//                                                 UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+//                                                 boolean isSystemUserImport);
 
     boolean validateAndProcessDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
                                          UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
@@ -48,10 +53,10 @@ public interface ImportService {
 
     ErrorObj validateEventTransition(StudyEvent studyEvent, UserAccount userAccount, String eventStatus);
 
-     StudyEvent updateStudyEventDatesAndStatus(StudyEvent studyEvent, UserAccount userAccount, String startDate, String endDate,String eventStatus);
+    StudyEvent updateStudyEventDatesAndStatus(StudyEvent studyEvent, UserAccount userAccount, String startDate, String endDate, String eventStatus);
 
-     StudyEvent updateStudyEvntStatus(StudyEvent studyEvent, UserAccount userAccount, String eventStatus);
+    StudyEvent updateStudyEvntStatus(StudyEvent studyEvent, UserAccount userAccount, String eventStatus);
 
-     void writeToFile(List<DataImportReport> dataImportReports, String fileName, JobType jobType);
+    void writeToFile(List<DataImportReport> dataImportReports, String fileName, JobType jobType);
 
-    }
+}

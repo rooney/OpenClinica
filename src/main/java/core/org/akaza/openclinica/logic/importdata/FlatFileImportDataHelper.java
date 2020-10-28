@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringWriter;
+import java.sql.Connection;
 import java.sql.Timestamp;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
@@ -20,6 +21,9 @@ import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import javax.sql.DataSource;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -32,6 +36,7 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import core.org.akaza.openclinica.bean.admin.CRFBean;
+import core.org.akaza.openclinica.bean.login.UserAccountBean;
 import core.org.akaza.openclinica.bean.managestudy.EventDefinitionCRFBean;
 import core.org.akaza.openclinica.bean.managestudy.StudyEventDefinitionBean;
 import core.org.akaza.openclinica.bean.managestudy.StudySubjectBean;
@@ -41,6 +46,7 @@ import core.org.akaza.openclinica.bean.submit.ItemGroupBean;
 import core.org.akaza.openclinica.dao.admin.CRFDAO;
 import core.org.akaza.openclinica.dao.core.CoreResources;
 import core.org.akaza.openclinica.dao.hibernate.StudyDao;
+import core.org.akaza.openclinica.dao.login.UserAccountDAO;
 import core.org.akaza.openclinica.dao.managestudy.EventDefinitionCRFDAO;
 import core.org.akaza.openclinica.dao.managestudy.StudyEventDAO;
 import core.org.akaza.openclinica.dao.managestudy.StudyEventDefinitionDAO;
@@ -54,13 +60,16 @@ import core.org.akaza.openclinica.i18n.util.ResourceBundleProvider;
 import core.org.akaza.openclinica.service.StudyBuildService;
 import core.org.akaza.openclinica.service.crfdata.ErrorObj;
 import core.org.akaza.openclinica.service.rest.errors.ErrorConstants;
+import org.akaza.openclinica.control.SpringServletAccess;
 import org.apache.commons.lang.StringUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.multipart.MultipartFile;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-public class PipeDelimitedDataHelper extends ImportDataHelper {
+public class FlatFileImportDataHelper extends ImportDataHelper {
 
     private final DataSource ds;
     private StudyDao studyDao;
@@ -70,7 +79,7 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
     private static final String DEFAULT_PARTICIPANT_ID_HEADER = "ParticipantID";
     private StudyBuildService studyBuildService;
 
-    public PipeDelimitedDataHelper(DataSource ds, StudyBuildService studyBuildService, StudyDao studyDao) {
+    public FlatFileImportDataHelper(DataSource ds, StudyBuildService studyBuildService, StudyDao studyDao) {
         super();
         this.ds = ds;
         this.studyBuildService = studyBuildService;
@@ -812,7 +821,7 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
                                     }
                                 }
                             }
-                        }  else if (keyWord != null && (keyWord.trim().startsWith(PARTICIPANT_ID_HEADER_PROPERTY) || keyWord.trim().indexOf("SkipMatchCriteria") == 1)) {
+                        } else if (keyWord != null && (keyWord.trim().startsWith(PARTICIPANT_ID_HEADER_PROPERTY) || keyWord.trim().indexOf("SkipMatchCriteria") == 1)) {
                             // do nothing
                         } else if (keyWord != null && (keyWord.trim().startsWith(DELIMITER_PROPERTY) || keyWord.trim().indexOf("SkipMatchCriteria") == 1)) {
                             // do nothing
@@ -1308,5 +1317,83 @@ public class PipeDelimitedDataHelper extends ImportDataHelper {
         return "";
     }
 
+    public String getFileName(List<File> files) {
+        String fileName = "";
+        for (File file : files) {
+            // skip mapping file
+            if (file.getName().toLowerCase().endsWith(".properties")) {
+            } else {
+                String originalFileName = file.getName();
+                int pos = originalFileName.indexOf(".");
+                if (pos > 0) {
+                    fileName = originalFileName.substring(0, pos);
+                }
+            }
+        }
+        return fileName;
+    }
 
+    /**
+     * Helper Method to get the user account
+     * @return UserAccountBean
+     */
+    public UserAccountBean getUserAccount(HttpServletRequest request) {
+        UserAccountBean userBean;
+
+        if (request.getSession() != null && request.getSession().getAttribute("userBean") != null) {
+            userBean = (UserAccountBean) request.getSession().getAttribute("userBean");
+
+        } else {
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            String username = null;
+            if (principal instanceof UserDetails) {
+                username = ((UserDetails) principal).getUsername();
+            } else {
+                username = principal.toString();
+            }
+
+            String schema = CoreResources.getRequestSchema();
+            CoreResources.setRequestSchemaToPublic();
+            UserAccountDAO userAccountDAO = new UserAccountDAO(ds);
+            userBean = (UserAccountBean) userAccountDAO.findByUserName(username);
+            CoreResources.setRequestSchema(schema);
+
+        }
+
+        return userBean;
+
+    }
+
+    public File getXSDFile(HttpServletRequest request, String fileNm) {
+        HttpSession session = request.getSession();
+        ServletContext context = session.getServletContext();
+
+        return new File(SpringServletAccess.getPropertiesDir(context) + fileNm);
+    }
+
+    /**
+     * @param studyOid
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    public Study setSchema(String studyOid, HttpServletRequest request) throws OpenClinicaSystemException {
+        // first time, the default DB schema for restful service is public
+        Study study = studyDao.findPublicStudy(studyOid);
+
+        Connection con;
+        String schemaNm = "";
+
+        if (study == null) {
+            throw new OpenClinicaSystemException("errorCode.studyNotExist", "The study identifier you provided:" + studyOid + " is not valid.");
+
+        } else {
+            schemaNm = study.getSchemaName();
+        }
+        request.setAttribute("requestSchema", schemaNm);
+        // get correct study from the right DB schema
+        study = studyDao.findByOcOID(studyOid);
+
+        return study;
+    }
 }
