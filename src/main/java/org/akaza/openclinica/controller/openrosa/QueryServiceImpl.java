@@ -191,7 +191,7 @@ public class QueryServiceImpl implements QueryService {
         if (user == null) {
             dn.setUserAccountByOwnerId(helperBean.getContainer().getUser());
         } else {
-            UserAccount userAccountByOwnerId = userAccountDao.findByUserName(user);
+            UserAccount userAccountByOwnerId = userAccountDao.findByUserNameCaseInSensitive(user);
             dn.setUserAccountByOwnerId(userAccountByOwnerId);
         }
 
@@ -204,7 +204,7 @@ public class QueryServiceImpl implements QueryService {
             }
         }
         if (!StringUtils.isEmpty(assignedTo)) {
-            UserAccount userAccount = userAccountDao.findByUserName(assignedTo);
+            UserAccount userAccount = userAccountDao.findByUserNameCaseInSensitive(assignedTo);
             if (userAccount == null) {
                 userAccount = createUserAccount(assignedTo, helperBean.getContainer().getStudy());
             }
