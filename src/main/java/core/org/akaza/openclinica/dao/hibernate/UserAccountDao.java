@@ -21,6 +21,14 @@ public class UserAccountDao extends AbstractDomainDao<UserAccount> {
         return (UserAccount) q.uniqueResult();
     }
 
+    public UserAccount findByUserNameCaseInSensitive(String userName) {
+        getSessionFactory().getStatistics().logSummary();
+        String query = "from " + getDomainClassName() + " do  where upper(do.userName) = upper(:user_name)";
+        Query q = getCurrentSession().createQuery(query);
+        q.setParameter("user_name", userName);
+        return (UserAccount) q.uniqueResult();
+    }
+
     @Transactional
     public UserAccount findByUserId(Integer userId) {
         getSessionFactory().getStatistics().logSummary();
