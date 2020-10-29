@@ -375,7 +375,7 @@ public class ImportValidationServiceImpl implements ImportValidationService{
     }
 
     private boolean isUserExist(String username, List<OCUserDTO> acceptedUsers){
-        return acceptedUsers.stream().filter(ocUserDTO -> ocUserDTO.getUsername().equals(username)).count() > 0 ;
+        return acceptedUsers.stream().filter(ocUserDTO -> ocUserDTO.getUsername().equalsIgnoreCase(username)).count() > 0 ;
     }
     public void setResolutionStatusForCheckingChildNotesValidity(String resolutionStatus){
         if(resolutionStatus != null) {

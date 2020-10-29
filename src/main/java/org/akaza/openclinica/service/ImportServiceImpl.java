@@ -1634,7 +1634,7 @@ public class ImportServiceImpl implements ImportService {
                 queryBean.setComment(childNoteBean.getDetailedNote());
                 queryBean.setStatus(childNoteBean.getStatus());
                 queryBean.setUser(childNoteBean.getOwnerUserName());
-                UserAccount userAccount = userAccountDao.findByUserName(childNoteBean.getOwnerUserName());
+                UserAccount userAccount = userAccountDao.findByUserNameCaseInSensitive(childNoteBean.getOwnerUserName());
                 helperBean.getContainer().setUser(userAccount);
                 if(childNoteBean.getUserRef() != null)
                     queryBean.setAssigned_to(childNoteBean.getUserRef().getUserName());
