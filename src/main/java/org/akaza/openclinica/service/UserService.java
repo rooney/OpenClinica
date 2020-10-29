@@ -60,4 +60,6 @@ public interface UserService {
 
     List<OCUserDTO> filterUserBasedOnStudyEventUuid(List<OCUserRoleDTO> userServiceList, StudyAndSiteEnvUuid studyAndSiteEnvUuid);
 
+    UserAccount findByUserNameCaseInSensitive(String userName);
+
 }

@@ -229,5 +229,5 @@ public class ErrorConstants {
     public static final String ERR_ITEMGROUP_REMOVED_ATTRIBUTE_INVALID = "errorCode.itemGroupRemovedAttributeIsInvalid";
     public static final String ERR_FIRST_REPEATING_ITEMGROUP_CANNOT_BE_REMOVED = "errorCode.firstRepeatingGroupCannotBeRemoved";
     public static final String ERR_NON_REPEATING_ITEMGROUP_CANNOT_BE_REMOVED = "errorCode.nonRepeatingGroupCannotBeRemoved";
-
+    public static final String ERR_MULTIPLE_USERS_WITH_SAME_USER_NAME = "errorCode.multipleUsersWithSameUserName";
 }

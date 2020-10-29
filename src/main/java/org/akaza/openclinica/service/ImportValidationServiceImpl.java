@@ -117,9 +117,9 @@ public class ImportValidationServiceImpl implements ImportValidationService{
             }
             if(childNoteBean.getOwnerUserName() == null)
                 errors.add(new ErrorObj(FAILED, generateFailedErrorMsg(childNoteBean.getDisplayId(), ErrorConstants.ERR_MISSING_USER_NAME)));
-            else if(!isUserExist(childNoteBean.getOwnerUserName(), accepatableUsers))
+            else if(!isUserExist(childNoteBean.getOwnerUserName(), accepatableUsers, childNoteBean.getDisplayId()))
                 errors.add(new ErrorObj(FAILED, generateFailedErrorMsg(childNoteBean.getDisplayId(), ErrorConstants.ERR_USER_NOT_VALID)));
-            if(!isResolutionTypeAnnotation && childNoteBean.getUserRef() != null && !isUserExist(childNoteBean.getUserRef().getUserName(), accepatableUsers))
+            if(!isResolutionTypeAnnotation && childNoteBean.getUserRef() != null && !isUserExist(childNoteBean.getUserRef().getUserName(), accepatableUsers, childNoteBean.getDisplayId()))
                 errors.add(new ErrorObj(FAILED, generateFailedErrorMsg(childNoteBean.getDisplayId(), ErrorConstants.ERR_ASSIGNED_USER_NOT_VALID)));
             if(StringUtils.isBlank(childNoteBean.getDetailedNote()))
                 errors.add(new ErrorObj(FAILED, generateFailedErrorMsg(childNoteBean.getDisplayId(), ErrorConstants.ERR_DETAILED_NOTE_MISSING)));
@@ -374,9 +374,14 @@ public class ImportValidationServiceImpl implements ImportValidationService{
         return false;
     }
 
-    private boolean isUserExist(String username, List<OCUserDTO> acceptedUsers){
-        return acceptedUsers.stream().filter(ocUserDTO -> ocUserDTO.getUsername().equalsIgnoreCase(username)).count() > 0 ;
+    private boolean isUserExist(String username, List<OCUserDTO> acceptedUsers, String displayId){
+        List<OCUserDTO> usersMatchingUserName = acceptedUsers.stream().filter(ocUserDTO -> ocUserDTO.getUsername().equalsIgnoreCase(username)).collect(Collectors.toList());
+        if(usersMatchingUserName.size() > 1)
+            throw new OpenClinicaSystemException(FAILED, generateFailedErrorMsg(displayId, ErrorConstants.ERR_MULTIPLE_USERS_WITH_SAME_USER_NAME));
+        else
+            return usersMatchingUserName.size() == 1;
     }
+
     public void setResolutionStatusForCheckingChildNotesValidity(String resolutionStatus){
         if(resolutionStatus != null) {
             if (resolutionStatus.equalsIgnoreCase(ResolutionStatus.OPEN.getName())) {

@@ -507,9 +507,14 @@ public class ImportServiceImpl implements ImportService {
                         String insertionType = QUERY_TYPE_KEYWORD;
                         if(discrepancyNoteBean.getNoteType() != null && discrepancyNoteBean.getNoteType().equalsIgnoreCase(QueryType.ANNOTATION.getName()))
                             insertionType = ANNOTATION_TYPE_KEYWORD;
-                        for(ErrorObj err : e.getMultiErrors()){
-                            dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(), studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(), itemDataBean.getItemOID(), insertionType, err.getCode(), null, err.getMessage());
+                        if(e.getMultiErrors() == null){
+                            dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(), studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(), itemDataBean.getItemOID(), insertionType, e.getErrorCode(), null, e.getMessage());
                             dataImportReports.add(dataImportReport);
+                        } else {
+                            for (ErrorObj err : e.getMultiErrors()) {
+                                dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(), studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(), itemDataBean.getItemOID(), insertionType, err.getCode(), null, err.getMessage());
+                                dataImportReports.add(dataImportReport);
+                            }
                         }
                         logger.error("Query Import {} related issue: ", itemDataBean.getItemOID());
                     }
@@ -1616,7 +1621,7 @@ public class ImportServiceImpl implements ImportService {
                 queryBean.setComment(childNoteBean.getDetailedNote());
                 queryBean.setStatus(childNoteBean.getStatus());
                 queryBean.setUser(childNoteBean.getOwnerUserName());
-                UserAccount userAccount = userAccountDao.findByUserNameCaseInSensitive(childNoteBean.getOwnerUserName());
+                UserAccount userAccount = userService.findByUserNameCaseInSensitive(childNoteBean.getOwnerUserName());
                 helperBean.getContainer().setUser(userAccount);
                 if(childNoteBean.getUserRef() != null)
                     queryBean.setAssigned_to(childNoteBean.getUserRef().getUserName());
