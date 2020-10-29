@@ -224,6 +224,15 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
         }
     }
 
+    /**
+     * Check study oid, site oid, user role permissions and start import.
+     * @param request request
+     * @param files the mapping file and the txt file
+     * @param hm mapping file hashmap
+     * @param studyOID studyoid
+     * @param userAccountBean userAccountBean
+     * @return job uuid
+     */
     public ResponseEntity<Object> validateStudyOidRolesAndStartImportJob(HttpServletRequest request, List<File> files, HashMap hm,
                                                                          String studyOID, UserAccountBean userAccountBean) {
         String fileNm = getFlatFileImportDataHelper().getFileName(files);

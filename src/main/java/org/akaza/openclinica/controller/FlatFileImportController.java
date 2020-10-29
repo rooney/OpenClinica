@@ -672,10 +672,10 @@ public class FlatFileImportController {
 
 
     /**
-     * Convert files , and start import.
+     * Check study oid, site oid, user role permissions and start import.
      * @param request request
      * @param files the mapping file and the txt file
-     * @param hm
+     * @param hm mapping file hashmap
      * @return response
      * @throws Exception
      */
