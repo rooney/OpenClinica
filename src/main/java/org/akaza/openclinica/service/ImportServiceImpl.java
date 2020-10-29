@@ -1,6 +1,5 @@
 package org.akaza.openclinica.service;
 
-import core.org.akaza.openclinica.bean.login.StudyUserRoleBean;
 import core.org.akaza.openclinica.bean.login.UserAccountBean;
 import core.org.akaza.openclinica.bean.submit.crfdata.*;
 import core.org.akaza.openclinica.core.form.xform.QueryBean;
@@ -12,9 +11,7 @@ import core.org.akaza.openclinica.domain.datamap.*;
 import core.org.akaza.openclinica.domain.enumsupport.JobType;
 import core.org.akaza.openclinica.domain.user.UserAccount;
 import core.org.akaza.openclinica.exception.OpenClinicaException;
-import core.org.akaza.openclinica.exception.OpenClinicaSystemException;
 import core.org.akaza.openclinica.logic.importdata.FlatFileImportDataHelper;
-import core.org.akaza.openclinica.service.CustomParameterizedException;
 import core.org.akaza.openclinica.service.JobService;
 import core.org.akaza.openclinica.service.StudyBuildService;
 import core.org.akaza.openclinica.service.UtilService;
@@ -40,8 +37,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -158,7 +153,7 @@ public class ImportServiceImpl implements ImportService {
     public static final String DATA_ENTRY_COMPLETE = "data entry complete";
     public static final String COMPLETE = "complete";
     public static final String DATA_ENTRY_STARTED = "data entry started";
-
+    public static final String LOCKED = "locked";
     public static final String FAILED = "Failed";
     public static final String INSERTED = "Inserted";
     public static final String UPDATED = "Updated";
@@ -174,14 +169,6 @@ public class ImportServiceImpl implements ImportService {
 
     SimpleDateFormat sdf_fileName = new SimpleDateFormat("yyyy-MM-dd'-'HHmmssSSS'Z'");
     SimpleDateFormat sdf_logFile = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-
-
-//    @Transactional
-//    public boolean validateAndProcessFlatFileDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
-//                                                        UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-//                                                        boolean isSystemUserImport) {
-//        return validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, true);
-//    }
 
     @Transactional
     public boolean validateAndProcessFlatFileDataImport(List<File> files, HashMap hm, String studyOid, String siteOid, UserAccountBean userAccountBean,
@@ -773,10 +760,14 @@ public class ImportServiceImpl implements ImportService {
 
 
     public StudyEvent updateStudyEventDatesAndStatus(StudyEvent studyEvent, UserAccount userAccount, String startDate, String endDate, String eventStatus) {
-        StudyEventWorkflowStatusEnum newEventStatus = getWorkflowStatus(eventStatus);
-        if (!studyEvent.getWorkflowStatus().equals(newEventStatus) && studyEvent.isCurrentlySigned())
-            studyEvent.setSigned(Boolean.FALSE);
-        studyEvent.setWorkflowStatus(getWorkflowStatus(eventStatus));
+        if (eventStatus.equalsIgnoreCase(LOCKED)) {
+            studyEvent.setLocked(true);
+        } else {
+            StudyEventWorkflowStatusEnum newEventStatus = getWorkflowStatus(eventStatus);
+            if (!studyEvent.getWorkflowStatus().equals(newEventStatus) && studyEvent.isCurrentlySigned())
+                studyEvent.setSigned(Boolean.FALSE);
+            studyEvent.setWorkflowStatus(getWorkflowStatus(eventStatus));
+        }
         setEventStartAndEndDate(studyEvent, startDate, endDate);
         studyEvent.setDateUpdated(new Date());
         studyEvent.setUpdateId(userAccount.getUserId());
@@ -796,10 +787,14 @@ public class ImportServiceImpl implements ImportService {
     }
 
     public StudyEvent updateStudyEvntStatus(StudyEvent studyEvent, UserAccount userAccount, String eventStatus) {
-        StudyEventWorkflowStatusEnum newEventStatus = getWorkflowStatus(eventStatus);
-        if (!studyEvent.getWorkflowStatus().equals(newEventStatus) && studyEvent.isCurrentlySigned())
-            studyEvent.setSigned(Boolean.FALSE);
-        studyEvent.setWorkflowStatus(newEventStatus);
+        if (eventStatus.equalsIgnoreCase(LOCKED)) {
+            studyEvent.setLocked(true);
+        } else {
+            StudyEventWorkflowStatusEnum newEventStatus = getWorkflowStatus(eventStatus);
+            if (!studyEvent.getWorkflowStatus().equals(newEventStatus) && studyEvent.isCurrentlySigned())
+                studyEvent.setSigned(Boolean.FALSE);
+            studyEvent.setWorkflowStatus(newEventStatus);
+        }
         studyEvent.setDateUpdated(new Date());
         studyEvent.setUpdateId(userAccount.getUserId());
         studyEvent = studyEventDao.saveOrUpdate(studyEvent);
@@ -1214,6 +1209,10 @@ public class ImportServiceImpl implements ImportService {
 
 
     public ErrorObj validateEventTransition(StudyEvent studyEvent, UserAccount userAccount, String eventStatus) {
+        if (eventStatus.equalsIgnoreCase(LOCKED)) {
+            return null;
+        }
+
         StudyEventWorkflowStatusEnum workflowStatus = getWorkflowStatus(eventStatus);
         if (workflowStatus == null)
             return new ErrorObj(FAILED, ErrorConstants.ERR_INVALID_EVENT_TRANSITION_STATUS);
@@ -1231,10 +1230,6 @@ public class ImportServiceImpl implements ImportService {
                     &&
                     !(workflowStatus.equals(StudyEventWorkflowStatusEnum.SKIPPED)
                             && studyEvent.getWorkflowStatus().equals(StudyEventWorkflowStatusEnum.SCHEDULED))
-            /****************  &&
-             !(workflowStatus.equals(StudyEventWorkflowEnum.LOCKED)
-             && (studyEvent.getWorkflowStatus().equals(StudyEventWorkflowEnum.COMPLETED)
-             || studyEvent.getWorkflowStatus().equals(StudyEventWorkflowEnum.SKIPPED)))*/
                     ) {
                 return new ErrorObj(FAILED, ErrorConstants.ERR_INVALID_EVENT_TRANSITION_STATUS);
             }
@@ -1273,11 +1268,7 @@ public class ImportServiceImpl implements ImportService {
                 && !StudyEventWorkflowStatusEnum.COMPLETED.toString().equalsIgnoreCase(eventStatus)
                 && !StudyEventWorkflowStatusEnum.SKIPPED.toString().equalsIgnoreCase(eventStatus)
                 && !StudyEventWorkflowStatusEnum.STOPPED.toString().equalsIgnoreCase(eventStatus)
-/********************
- && !StudyEventWorkflowEnum.LOCKED.getDisplayValue().equalsIgnoreCase(eventStatus)
- */)
-
-        {
+                && !LOCKED.equalsIgnoreCase(eventStatus)) {
             return new ErrorObj(FAILED, ErrorConstants.ERR_INVALID_EVENT_STATUS);
         }
         return null;

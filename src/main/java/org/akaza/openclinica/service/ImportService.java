@@ -31,10 +31,6 @@ public interface ImportService {
                                                  UserAccountBean userAccountBean, boolean isSystemUserImport,
                                                  JobDetail jobDetail, String schema) throws Exception;
 
-//    boolean validateAndProcessFlatFileDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
-//                                                 UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-//                                                 boolean isSystemUserImport);
-
     boolean validateAndProcessDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
                                          UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
                                          boolean isSystemUserImport, boolean isFlatFile);

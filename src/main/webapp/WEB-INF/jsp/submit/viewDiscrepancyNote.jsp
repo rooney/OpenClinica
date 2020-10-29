@@ -274,7 +274,7 @@
             </td>
         </tr>
              
-        <table border="0" style="padding-left: 330px;" align="left">
+        <table border="0" style="padding-left: 330px; display:block" align="left">
             <c:if test="${!study.status.locked}">
                 <tr>
                 <td class="table_cell_left" colspan="4" align="left">

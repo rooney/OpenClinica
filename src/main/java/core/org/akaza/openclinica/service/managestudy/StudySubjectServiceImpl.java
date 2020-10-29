@@ -569,7 +569,7 @@ public class StudySubjectServiceImpl implements StudySubjectService {
 
         if (studySubject.getStatus().isSigned() || studyEvents.size() == 0){
             return false;}
-
+        boolean atLeastOneEventIsSkippedStoppedCompleted=false;
         for (StudyEvent studyEvent: studyEvents) {
             if(studyEvent.getStudyEventDefinition().getType().equals(COMMON)){
                 List <EventCrf> eventCrfs = eventCrfDao.findByStudyEventIdStudySubjectId(studyEvent.getStudyEventId(), studySubject.getOcOid());
@@ -585,6 +585,7 @@ public class StudySubjectServiceImpl implements StudySubjectService {
                         && !studyEvent.getWorkflowStatus().equals(StudyEventWorkflowStatusEnum.COMPLETED)) {
                     return false;
                 } else {
+                    atLeastOneEventIsSkippedStoppedCompleted= true;
                     if (!studyEventService.isEventSignable(studyEvent)) {
                         return false;
                     }
@@ -592,7 +593,7 @@ public class StudySubjectServiceImpl implements StudySubjectService {
             }
         }
 
-        return true;
+        return atLeastOneEventIsSkippedStoppedCompleted;
     }
 
     public DataSource getDataSource() {
