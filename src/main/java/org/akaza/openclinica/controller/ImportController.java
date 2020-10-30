@@ -1,5 +1,6 @@
 package org.akaza.openclinica.controller;
 
+import core.org.akaza.openclinica.bean.odmbeans.DiscrepancyNotesBean;
 import core.org.akaza.openclinica.service.CustomParameterizedException;
 import core.org.akaza.openclinica.service.UtilService;
 import io.swagger.annotations.Api;
@@ -102,7 +103,7 @@ public class ImportController {
             }
             importXml = buffer.toString();
         }
-
+        String accessToken = (String) request.getSession().getAttribute("accessToken");
 
         Mapping myMap = new Mapping();
         String ODM_MAPPING_DIRPath = CoreResources.ODM_MAPPING_DIR;
@@ -201,7 +202,7 @@ public class ImportController {
 
         String uuid;
         try {
-            uuid = startImportJob(odmContainer, schema, studyOid, siteOid, userAccountBean, fileNm, isSystemUserImport);
+            uuid = startImportJob(odmContainer, schema, studyOid, siteOid, userAccountBean, fileNm, isSystemUserImport, accessToken);
         } catch (CustomParameterizedException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
@@ -218,7 +219,7 @@ public class ImportController {
     }
 
     public String startImportJob(ODMContainer odmContainer, String schema, String studyOid, String siteOid,
-                                 UserAccountBean userAccountBean, String fileNm, boolean isSystemUserImport) {
+                                 UserAccountBean userAccountBean, String fileNm, boolean isSystemUserImport, String accessToken) {
         utilService.setSchemaFromStudyOid(studyOid);
 
         Study site = studyDao.findByOcOID(siteOid);
@@ -227,7 +228,7 @@ public class ImportController {
         if (isSystemUserImport) {
             // For system level imports, instead of running import as an asynchronous job, run it synchronously
             logger.debug("Running import synchronously");
-            boolean isImportSuccessful = importService.validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, null, isSystemUserImport);
+            boolean isImportSuccessful = importService.validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, null, isSystemUserImport, accessToken);
             if (!isImportSuccessful) {
                 // Throw an error if import fails such that randomize service can update the status accordingly
                 throw new CustomParameterizedException(ErrorConstants.ERR_IMPORT_FAILED);
@@ -237,9 +238,9 @@ public class ImportController {
             JobDetail jobDetail = userService.persistJobCreated(study, site, userAccount, JobType.XML_IMPORT, fileNm);
             CompletableFuture<Object> future = CompletableFuture.supplyAsync(() -> {
                 try {
-                    importService.validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport);
+                    importService.validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, accessToken);
                 } catch (Exception e) {
-                    logger.error("Exception is thrown while processing dataImport: " + e);
+                    logger.error("Exception is thrown while processing dataImport: " , e);
                     userService.persistJobFailed(jobDetail,fileNm);
                 }
                 return null;
