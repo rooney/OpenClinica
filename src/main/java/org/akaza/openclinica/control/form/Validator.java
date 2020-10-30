@@ -460,7 +460,7 @@ public class Validator {
     public static final int SUBMISSION_URL_NOT_UNIQUE = 45;
     
     public static final int NO_LEADING_OR_TRAILING_SPACES = 46;
-    public static final int DOES_NOT_CONTAIN_HTML_LESSTHAN_GREATERTHAN_ELEMENTS = 47;
+    public static final int DOES_NOT_CONTAIN_FORBIDDEN_CHARS = 47;
     public static final int HIBERNATE_ENTITY_EXISTS = 48; // for checking if a primary key
     /**
      * The last field for which an addValidation method was invoked. This is
@@ -869,8 +869,8 @@ public class Validator {
             case SUBMISSION_URL_NOT_UNIQUE:
                 errorMessage = resexception.getString("field_submission_url_not_unique");
                 break;
-            case DOES_NOT_CONTAIN_HTML_LESSTHAN_GREATERTHAN_ELEMENTS:
-                errorMessage = resexception.getString("study_subject_id_can_not_contain_html_lessthan_or_greaterthan_elements");
+            case DOES_NOT_CONTAIN_FORBIDDEN_CHARS:
+                errorMessage = resexception.getString("participant_id_cannot_contain_these_characters");
                 break;
             }
         }
@@ -1173,7 +1173,7 @@ public class Validator {
             if (isSubmissionUrlUnique(fieldName)) {
                 addError(fieldName, v);
             }
-        case DOES_NOT_CONTAIN_HTML_LESSTHAN_GREATERTHAN_ELEMENTS:
+        case DOES_NOT_CONTAIN_FORBIDDEN_CHARS:
             if (doesContainHtmlElements(fieldName)) {
                 addError(fieldName, v);
             }
@@ -1831,7 +1831,7 @@ break;
         String fieldValue = getFieldValue(fieldName);
         if (fieldValue == null)
             return false;
-        if (fieldValue.contains("<") || fieldValue.contains(">")) {
+        if (Validator.containsForbiddenChar(fieldValue)) {
             return true;
         }
         return false;
@@ -2220,5 +2220,12 @@ break;
         return message;
     }
 
+    public static boolean containsForbiddenChar(String participantId) {
+        return participantId.contains("\"") ||
+                participantId.contains("<") ||
+                participantId.contains(">") ||
+                participantId.contains("&") ||
+                participantId.contains("'");
+    }
 
 }

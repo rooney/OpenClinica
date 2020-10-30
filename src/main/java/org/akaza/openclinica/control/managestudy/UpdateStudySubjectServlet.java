@@ -327,7 +327,7 @@ public class UpdateStudySubjectServlet extends SecureController {
         if (ub.isSysAdmin() || currentRole.isManageStudy() || currentRole.isInvestigator() || currentRole.isResearchAssistant() || currentStudy.checkAndGetParentStudyId() > 0 && currentRole.isResearchAssistant2()) {
 
             validator.addValidation("label", Validator.NO_BLANKS);
-            validator.addValidation("label", Validator.DOES_NOT_CONTAIN_HTML_LESSTHAN_GREATERTHAN_ELEMENTS);
+            validator.addValidation("label", Validator.DOES_NOT_CONTAIN_FORBIDDEN_CHARS);
             validator.addValidation("label", Validator.LENGTH_NUMERIC_COMPARISON, NumericComparisonOperator.LESS_THAN_OR_EQUAL_TO, 30);
 
             if (!StringUtil.isBlank(fp.getString("label"))) {

@@ -240,9 +240,9 @@ public class AddNewSubjectServlet extends SecureController {
 
             HashMap errors = v.validate();
 
-            if (label.contains("<") || label.contains(">")) {
+            if (Validator.containsForbiddenChar(label)) {
                 Validator.addError(errors, INPUT_LABEL, resexception
-                        .getString("study_subject_id_can_not_contain_html_lessthan_or_greaterthan_elements"));
+                        .getString("participant_id_cannot_contain_these_characters"));
             }
             StudySubjectBean subjectWithSameLabel = ssd.findByLabelAndStudyForCreatingParticipant(label, currentStudy.getStudyId());
 
