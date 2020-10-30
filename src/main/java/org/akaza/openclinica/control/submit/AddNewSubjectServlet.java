@@ -240,12 +240,7 @@ public class AddNewSubjectServlet extends SecureController {
 
             HashMap errors = v.validate();
 
-            if (label.contains("<") || 
-                label.contains(">") || 
-                label.contains("&") || 
-                label.contains("'") || 
-                label.contains("\"")
-            ) {
+            if (Validator.containsForbiddenChar(label)) {
                 Validator.addError(errors, INPUT_LABEL, resexception
                         .getString("participant_id_cannot_contain_these_characters"));
             }

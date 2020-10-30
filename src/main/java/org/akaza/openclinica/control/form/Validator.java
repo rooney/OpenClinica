@@ -1831,12 +1831,7 @@ break;
         String fieldValue = getFieldValue(fieldName);
         if (fieldValue == null)
             return false;
-        if (fieldValue.contains("<") || 
-            fieldValue.contains(">") || 
-            fieldValue.contains("&") || 
-            fieldValue.contains("'") || 
-            fieldValue.contains("\"")
-        ) {
+        if (Validator.containsForbiddenChar(fieldValue)) {
             return true;
         }
         return false;
@@ -2225,5 +2220,12 @@ break;
         return message;
     }
 
+    public static boolean containsForbiddenChar(String participantId) {
+        return participantId.contains("\"") ||
+                participantId.contains("<") ||
+                participantId.contains(">") ||
+                participantId.contains("&") ||
+                participantId.contains("'");
+    }
 
 }

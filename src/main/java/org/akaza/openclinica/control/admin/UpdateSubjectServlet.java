@@ -188,12 +188,7 @@ public class UpdateSubjectServlet extends SecureController {
          }
         
         String personId = fp.getString(INPUT_UNIQUE_IDENTIFIER);
-        if (personId.contains("<") || 
-            personId.contains(">") || 
-            personId.contains("&") || 
-            personId.contains("'") || 
-            personId.contains("\"")
-        ) {
+        if (Validator.containsForbiddenChar(personId)) {
             v.addValidation("uniqueIdentifier", Validator.DOES_NOT_CONTAIN_FORBIDDEN_CHARS);
         }
 
