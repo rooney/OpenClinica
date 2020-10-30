@@ -1044,6 +1044,7 @@ public class UserServiceImpl implements UserService {
             OCUserDTO userInfo = ocUser.getUserInfo();
             if(userInfo.getUsername().equals("root")){
                 userList.add(userInfo);
+                continue;
             }
             if (!userInfo.getStatus().equals(UserStatus.ACTIVE) && !userInfo.getStatus().equals(UserStatus.INVITED))
                 continue;
