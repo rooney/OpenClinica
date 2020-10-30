@@ -142,6 +142,7 @@ public class UserServiceImpl implements UserService {
     public static final String SEPERATOR = ",";
     public static final String PARTICIPANT_ACCESS_CODE = "_Participant Access Code";
     public static final String AUTH0_CALL_FAILED = "errorCode.auth0CallFailed";
+    public static final String FAILED = "Failed";
     private final int USERLIST_TIMEOUT = 3000;
     SimpleDateFormat sdf_fileName = new SimpleDateFormat("yyyy-MM-dd'-'HHmmssSSS'Z'");
 
@@ -1043,6 +1044,7 @@ public class UserServiceImpl implements UserService {
             OCUserDTO userInfo = ocUser.getUserInfo();
             if(userInfo.getUsername().equals("root")){
                 userList.add(userInfo);
+                continue;
             }
             if (!userInfo.getStatus().equals(UserStatus.ACTIVE) && !userInfo.getStatus().equals(UserStatus.INVITED))
                 continue;
@@ -1114,5 +1116,14 @@ public class UserServiceImpl implements UserService {
 
         return response.getBody();
 
+    }
+
+    public UserAccount findByUserNameCaseInSensitive(String userName) {
+        List<UserAccount> userAccounts = userAccountDao.findAllByUserName(userName);
+        if(userAccounts.size() == 1)
+            return userAccounts.get(0);
+        if(userAccounts.size() > 1)
+            throw new OpenClinicaSystemException(FAILED, ErrorConstants.ERR_MULTIPLE_USERS_WITH_SAME_USER_NAME);
+        return null;
     }
 }

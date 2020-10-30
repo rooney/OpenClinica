@@ -21,12 +21,13 @@ public class UserAccountDao extends AbstractDomainDao<UserAccount> {
         return (UserAccount) q.uniqueResult();
     }
 
-    public UserAccount findByUserNameCaseInSensitive(String userName) {
+    //Use the UserService.findByUserNameCaseInSensitive() method instead for finding the case insensitive search
+    public List<UserAccount> findAllByUserName(String userName) {
         getSessionFactory().getStatistics().logSummary();
         String query = "from " + getDomainClassName() + " do  where upper(do.userName) = upper(:user_name)";
         Query q = getCurrentSession().createQuery(query);
         q.setParameter("user_name", userName);
-        return (UserAccount) q.uniqueResult();
+        return (List<UserAccount>) q.list();
     }
 
     @Transactional

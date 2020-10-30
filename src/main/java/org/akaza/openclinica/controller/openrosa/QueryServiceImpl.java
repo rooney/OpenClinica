@@ -34,6 +34,7 @@ import core.org.akaza.openclinica.service.crfdata.EnketoUrlService;
 import core.org.akaza.openclinica.web.SQLInitServlet;
 import core.org.akaza.openclinica.web.pform.OpenRosaService;
 import core.org.akaza.openclinica.web.pform.StudyAndSiteEnvUuid;
+import org.akaza.openclinica.service.UserService;
 import org.akaza.openclinica.web.restful.errors.ErrorConstants;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.RandomUtils;
@@ -75,6 +76,8 @@ public class QueryServiceImpl implements QueryService {
     private BeanFactory beanFactory;
     @Autowired
     private EnketoUrlService enketoUrlService;
+    @Autowired
+    private UserService userService;
 
     @Autowired
     private ApplicationContext appContext;
@@ -191,7 +194,7 @@ public class QueryServiceImpl implements QueryService {
         if (user == null) {
             dn.setUserAccountByOwnerId(helperBean.getContainer().getUser());
         } else {
-            UserAccount userAccountByOwnerId = userAccountDao.findByUserNameCaseInSensitive(user);
+            UserAccount userAccountByOwnerId = userService.findByUserNameCaseInSensitive(user);
             dn.setUserAccountByOwnerId(userAccountByOwnerId);
         }
 
@@ -204,7 +207,7 @@ public class QueryServiceImpl implements QueryService {
             }
         }
         if (!StringUtils.isEmpty(assignedTo)) {
-            UserAccount userAccount = userAccountDao.findByUserNameCaseInSensitive(assignedTo);
+            UserAccount userAccount = userService.findByUserNameCaseInSensitive(assignedTo);
             if (userAccount == null) {
                 userAccount = createUserAccount(assignedTo, helperBean.getContainer().getStudy());
             }
