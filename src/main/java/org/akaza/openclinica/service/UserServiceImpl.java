@@ -3,6 +3,8 @@ package org.akaza.openclinica.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import core.org.akaza.openclinica.service.*;
+import core.org.akaza.openclinica.web.pform.OpenRosaServiceImpl;
+import core.org.akaza.openclinica.web.pform.StudyAndSiteEnvUuid;
 import org.akaza.openclinica.ParticipateInviteEnum;
 import org.akaza.openclinica.ParticipateInviteStatusEnum;
 import core.org.akaza.openclinica.bean.core.Role;
@@ -30,10 +32,13 @@ import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -52,7 +57,14 @@ import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static core.org.akaza.openclinica.domain.rule.action.NotificationActionProcessor.messageServiceUri;
 import static core.org.akaza.openclinica.domain.rule.action.NotificationActionProcessor.sbsUrl;
@@ -115,6 +127,9 @@ public class UserServiceImpl implements UserService {
     @Autowired
     JobService jobService;
 
+    @Autowired
+    private BeanFactory beanFactory;
+
     public static final String FORM_CONTEXT = "ecid";
     public static final String DASH = "-";
     public static final String PARTICIPATE_EDIT = "participate-edit";
@@ -126,6 +141,9 @@ public class UserServiceImpl implements UserService {
     public static final String ENABLED = "enabled";
     public static final String SEPERATOR = ",";
     public static final String PARTICIPANT_ACCESS_CODE = "_Participant Access Code";
+    public static final String AUTH0_CALL_FAILED = "errorCode.auth0CallFailed";
+    public static final String FAILED = "Failed";
+    private final int USERLIST_TIMEOUT = 3000;
     SimpleDateFormat sdf_fileName = new SimpleDateFormat("yyyy-MM-dd'-'HHmmssSSS'Z'");
 
     private String urlBase = CoreResources.getField("sysURL").split("/MainMenu")[0];
@@ -957,5 +975,155 @@ public class UserServiceImpl implements UserService {
         jobDetail.setStatus(JobStatus.FAILED);
         jobDetail = jobService.saveOrUpdateJob(jobDetail);
         logger.debug("Job Id {} has failed", jobDetail.getJobDetailId());
+    }
+
+    public List<OCUserDTO> getfilteredOCUsersDTOFromUserService( StudyAndSiteEnvUuid studyAndSiteEnvUuid, String accessToken) {
+        List<OCUserRoleDTO> userServiceList = getOcUserRoleDTOsFromUserService(studyAndSiteEnvUuid.getStudyEnvUuid(), accessToken);
+        List<OCUserDTO> userList = filterUserBasedOnStudyEventUuid(userServiceList, studyAndSiteEnvUuid);
+        return userList;
+    }
+    public List<OCUserRoleDTO> getOcUserRoleDTOsFromUserService(String studyEnvUuid, String accessToken1) {
+        Supplier<ResponseEntity<List<OCUserRoleDTO>>> getUserList = () -> {
+            String accessToken = accessToken1;
+            String baseUrl = CoreResources.getField("SBSBaseUrl");
+
+            String uri = baseUrl+"/user-service/api/study-environments/" + studyEnvUuid + "/users-with-roles" + "?page=0&size=1000";
+
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.registerModule(new JavaTimeModule());
+            if (org.apache.commons.lang.StringUtils.isEmpty(accessToken))
+                accessToken = keycloakClient.getSystemToken();
+            headers.add("Authorization", "Bearer " + accessToken);
+            headers.add("Accept-Charset", "UTF-8");
+            HttpEntity<String> entity = new HttpEntity<String>(headers);
+            List<HttpMessageConverter<?>> converters = new ArrayList<>();
+            MappingJackson2HttpMessageConverter jsonConverter = new MappingJackson2HttpMessageConverter();
+            jsonConverter.setObjectMapper(objectMapper);
+            converters.add(jsonConverter);
+            restTemplate.setMessageConverters(converters);
+            Instant start = Instant.now();
+            ResponseEntity<List<OCUserRoleDTO>> response =
+                    restTemplate.exchange(uri, HttpMethod.GET, entity, new ParameterizedTypeReference<List<OCUserRoleDTO>>() {});
+            Instant end = Instant.now();
+            logger.info("***** Time execution for {} method : {}   *****", new Object() {
+            }.getClass().getEnclosingMethod().getName(), Duration.between(start, end));
+            // to test the future.complete(null)
+            //throw new RuntimeException("***UserList failed");
+            return response;
+
+        };
+        return callManagementApi(getUserList, accessToken1);
+    }
+
+    /*Added userAccount for import purposes*/
+    public List<OCUserRoleDTO> addOCUserFromUserService(String studyEnvUUId, String accessToken){
+        List<OCUserRoleDTO> userRolesFormUserService = getOcUserRoleDTOsFromUserService(studyEnvUUId, accessToken);
+        List<UserAccount> existingUsers = userAccountDao.findAll();
+        if(userRolesFormUserService != null && !userRolesFormUserService.isEmpty()){
+            Map<String, UserAccount> userAccountMap = new HashMap<>();
+            if(existingUsers != null)
+                userAccountMap = existingUsers.stream().collect(Collectors.toMap(UserAccount::getUserName, userAccount -> userAccount));
+            Map<String, UserAccount> finalUserAccountMap = userAccountMap;
+            List<OCUserRoleDTO> newUsers = userRolesFormUserService.stream().filter(ocUserRoleDTO -> !finalUserAccountMap.containsKey(ocUserRoleDTO.getUserInfo().getUsername())).collect(Collectors.toList());
+            for(OCUserRoleDTO ocUserRoleDTO : newUsers) {
+                UserAccount userAccount = beanFactory.getBean(UserAccount.class, ocUserRoleDTO.getUserInfo());
+                userAccount = userAccountDao.saveOrUpdate(userAccount);
+            }
+        }
+        return userRolesFormUserService;
+    }
+    public List<OCUserDTO> filterUserBasedOnStudyEventUuid(List<OCUserRoleDTO> userServiceList, StudyAndSiteEnvUuid studyAndSiteEnvUuid){
+        if (userServiceList == null)
+            return null;
+        List<OCUserDTO> userList = new ArrayList<>();
+        for (OCUserRoleDTO ocUser : userServiceList) {
+            List<StudyEnvironmentRoleDTO> roles = ocUser.getRoles();
+            OCUserDTO userInfo = ocUser.getUserInfo();
+            if(userInfo.getUsername().equals("root")){
+                userList.add(userInfo);
+                continue;
+            }
+            if (!userInfo.getStatus().equals(UserStatus.ACTIVE) && !userInfo.getStatus().equals(UserStatus.INVITED))
+                continue;
+            for (StudyEnvironmentRoleDTO role : roles) {
+                boolean include = true;
+                if (org.apache.commons.lang.StringUtils.isNotEmpty(studyAndSiteEnvUuid.getSiteEnvUuid())) {
+                    include = false;
+                    if (org.apache.commons.lang.StringUtils.isEmpty(role.getSiteUuid()) || (org.apache.commons.lang.StringUtils.equals(role.getSiteUuid(), studyAndSiteEnvUuid.getSiteEnvUuid())))
+                        include = true;
+                } else {
+                    // site level users are anot be dded if the participant is not at the site level
+                    if (org.apache.commons.lang.StringUtils.isNotEmpty(role.getSiteUuid())) {
+                        include = false;
+                    }
+                }
+                if (include) {
+                    userList.add(userInfo);
+                }
+            }
+        }
+        return userList;
+    }
+
+    /**
+     * This method calls the given supplier and if the API call returns a 401 (because of expired token), it will
+     * re-initialize the token and call the API again with the new token.
+     * @param supplier the response type
+     * @return the response entity list if successful, otherwise logs an exception and returns null.
+     */
+    public  <T> List<T>  callManagementApi(Supplier<ResponseEntity<List<T>>> supplier, String accessToken) {
+        ResponseEntity<List<T>> response;
+
+        CompletableFuture<ResponseEntity<List<T>>> future
+                = CompletableFuture.supplyAsync(supplier);
+
+        try {
+            String timeoutStr = CoreResources.getField("queryUserListServiceTimeout");
+            response = future.get(USERLIST_TIMEOUT, TimeUnit.MILLISECONDS);
+        }  catch(TimeoutException e) {
+            logger.error("User Service Timeout", "User service did not respond within allocated time");
+            return null;
+        } catch (Exception e) {
+            Throwable t = e.getCause();
+            logger.error("Exception:" + t);
+            if (t instanceof HttpClientErrorException) {
+                HttpClientErrorException ex = (HttpClientErrorException) t;
+                if (ex.getStatusCode().equals(HttpStatus.UNAUTHORIZED)) {
+                    logger.error("**********Auth0 access token expired. Creating a new one.");
+                    accessToken =keycloakClient.getSystemToken();
+                    logger.error("*********Calling the api again with the new token.");
+                    response = supplier.get();
+                } else {
+                    // for all other 4xx errors, extract the error message from Auth0 and throw a 400 error
+                    String errorResponse = ex.getResponseBodyAsString();
+                    logger.error(AUTH0_CALL_FAILED, errorResponse);
+                    return null;
+                }
+            } else {
+                String errorResponse = e.getMessage();
+                logger.error(AUTH0_CALL_FAILED, errorResponse);
+                return null;
+            }
+
+        }
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new CustomParameterizedException(AUTH0_CALL_FAILED, response.getStatusCode().getReasonPhrase());
+        }
+
+        return response.getBody();
+
+    }
+
+    public UserAccount findByUserNameCaseInSensitive(String userName) {
+        List<UserAccount> userAccounts = userAccountDao.findAllByUserName(userName);
+        if(userAccounts.size() == 1)
+            return userAccounts.get(0);
+        if(userAccounts.size() > 1)
+            throw new OpenClinicaSystemException(FAILED, ErrorConstants.ERR_MULTIPLE_USERS_WITH_SAME_USER_NAME);
+        return null;
     }
 }

@@ -21,6 +21,15 @@ public class UserAccountDao extends AbstractDomainDao<UserAccount> {
         return (UserAccount) q.uniqueResult();
     }
 
+    //Use the UserService.findByUserNameCaseInSensitive() method instead for finding the case insensitive search
+    public List<UserAccount> findAllByUserName(String userName) {
+        getSessionFactory().getStatistics().logSummary();
+        String query = "from " + getDomainClassName() + " do  where upper(do.userName) = upper(:user_name)";
+        Query q = getCurrentSession().createQuery(query);
+        q.setParameter("user_name", userName);
+        return (List<UserAccount>) q.list();
+    }
+
     @Transactional
     public UserAccount findByUserId(Integer userId) {
         getSessionFactory().getStatistics().logSummary();

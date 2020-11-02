@@ -235,6 +235,7 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
      */
     public ResponseEntity<Object> validateStudyOidRolesAndStartImportJob(HttpServletRequest request, List<File> files, HashMap hm,
                                                                          String studyOID, UserAccountBean userAccountBean) {
+        String accessToken = (String) request.getSession().getAttribute("accessToken");
         String fileNm = getFlatFileImportDataHelper().getFileName(files);
         studyOID = studyOID.toUpperCase();
         Study publicStudy = getStudyDao().findPublicStudy(studyOID);
@@ -295,7 +296,7 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
 
         String uuid;
         try {
-            uuid = startImportJob(files, hm, studyOid, siteOid, userAccountBean, fileNm, schema, isSystemUserImport);
+            uuid = startImportJob(files, hm, studyOid, siteOid, userAccountBean, fileNm, schema, isSystemUserImport, accessToken);
             return new ResponseEntity("Job uuid: " + uuid, org.springframework.http.HttpStatus.OK);
         } catch (CustomParameterizedException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
@@ -303,7 +304,7 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
     }
 
     public String startImportJob(List<File> files, HashMap hm, String studyOid, String siteOid,
-                                 UserAccountBean userAccountBean, String fileNm, String schema, boolean isSystemUserImport) {
+                                 UserAccountBean userAccountBean, String fileNm, String schema, boolean isSystemUserImport, String accessToken) {
         getUtilService().setSchemaFromStudyOid(studyOid);
 
         Study site = getStudyDao().findByOcOID(siteOid);
@@ -313,7 +314,7 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
             // For system level imports, instead of running import as an asynchronous job, run it synchronously
             logger.debug("Running import synchronously");
             try {
-                getImportService().validateAndProcessFlatFileDataImport(files, hm, studyOid, siteOid, userAccountBean, isSystemUserImport, null, schema);
+                getImportService().validateAndProcessFlatFileDataImport(files, hm, studyOid, siteOid, userAccountBean, isSystemUserImport, null, schema, accessToken);
             } catch (Exception e) {
                 throw new CustomParameterizedException(ErrorConstants.ERR_IMPORT_FAILED);
             }
@@ -322,7 +323,7 @@ public class UploadCRFDataToHttpServerServlet extends SecureController {
             JobDetail jobDetail = getUserService().persistJobCreated(study, site, userAccount, JobType.FLAT_FILE_IMPORT, fileNm);
             CompletableFuture<Object> future = CompletableFuture.supplyAsync(() -> {
                 try {
-                    getImportService().validateAndProcessFlatFileDataImport(files, hm, studyOid, siteOid, userAccountBean, isSystemUserImport, jobDetail, schema);
+                    getImportService().validateAndProcessFlatFileDataImport(files, hm, studyOid, siteOid, userAccountBean, isSystemUserImport, jobDetail, schema, accessToken);
                     //importService.validateAndProcessFlatFileDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport);
                 } catch (Exception e) {
                     logger.error("Exception is thrown while processing dataImport: " + e);

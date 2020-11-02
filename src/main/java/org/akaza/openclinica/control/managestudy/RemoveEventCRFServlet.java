@@ -38,6 +38,8 @@ import core.org.akaza.openclinica.dao.submit.EventCRFDAO;
 import core.org.akaza.openclinica.dao.submit.FormLayoutDAO;
 import core.org.akaza.openclinica.dao.submit.ItemDataDAO;
 import core.org.akaza.openclinica.domain.datamap.EventCrf;
+import org.akaza.openclinica.controller.openrosa.QueryService;
+import org.akaza.openclinica.view.Page;
 import core.org.akaza.openclinica.web.InsufficientPermissionException;
 import org.akaza.openclinica.control.SpringServletAccess;
 import org.akaza.openclinica.control.core.SecureController;
@@ -46,6 +48,7 @@ import org.akaza.openclinica.domain.enumsupport.StudyEventWorkflowStatusEnum;
 import org.akaza.openclinica.view.Page;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.context.support.WebApplicationContextUtils;
 
 /**
  * Removes an Event CRF
@@ -57,6 +60,7 @@ public class RemoveEventCRFServlet extends SecureController {
 
     private StudyEventDAO studyEventDAO;
     private EventCRFDAO eventCRFDAO;
+    private QueryService queryService;
     /**
      * 
      */
@@ -89,6 +93,7 @@ public class RemoveEventCRFServlet extends SecureController {
         StudySubjectDAO subdao = new StudySubjectDAO(sm.getDataSource());
         EventCrfDao eventCrfDao = (EventCrfDao) SpringServletAccess.getApplicationContext(context).getBean("eventCrfDao");
         eventCRFDAO = (EventCRFDAO) SpringServletAccess.getApplicationContext(context).getBean("eventCRFJDBCDao");
+        queryService = (QueryService) WebApplicationContextUtils.getWebApplicationContext(getServletContext()).getBean("queryService");
 
         if (eventCRFId == 0) {
             addPageMessage(respage.getString("please_choose_an_event_CRF_to_remove"));
@@ -209,7 +214,10 @@ public class RemoveEventCRFServlet extends SecureController {
                                 dnb.setParentDnId(itemParentNote.getId());
                                 dnb.setDiscrepancyNoteTypeId(itemParentNote.getDiscrepancyNoteTypeId());
                                 dnb.setThreadUuid(itemParentNote.getThreadUuid());
+                                dnb.setDisplayId(queryService.generateDisplayId(false));
                             }
+                            else
+                                dnb.setDisplayId(queryService.generateDisplayId(true));
                             dnb.setResolutionStatusId(ResolutionStatus.CLOSED_MODIFIED.getId()); // set to closed-modified
                             dnb.setStudyId(currentStudy.getStudyId());
                             dnb.setAssignedUserId(ub.getId());

@@ -4,17 +4,17 @@ import static org.akaza.openclinica.control.core.SecureController.respage;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 import javax.mail.MessagingException;
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
+
+import core.org.akaza.openclinica.dao.core.CoreResources;
+import core.org.akaza.openclinica.exception.OpenClinicaSystemException;
+import core.org.akaza.openclinica.i18n.util.ResourceBundleProvider;
+import core.org.akaza.openclinica.service.ItemDataService;
 import org.akaza.openclinica.controller.openrosa.processor.QueryServiceHelperBean;
 import core.org.akaza.openclinica.core.EmailEngine;
 import core.org.akaza.openclinica.core.form.xform.QueriesBean;
@@ -26,9 +26,7 @@ import core.org.akaza.openclinica.dao.hibernate.EventCrfDao;
 import core.org.akaza.openclinica.dao.hibernate.ItemDao;
 import core.org.akaza.openclinica.dao.hibernate.ItemDataDao;
 import core.org.akaza.openclinica.dao.hibernate.ResolutionStatusDao;
-import core.org.akaza.openclinica.dao.hibernate.StudyDao;
 import core.org.akaza.openclinica.dao.hibernate.UserAccountDao;
-import core.org.akaza.openclinica.domain.Status;
 import core.org.akaza.openclinica.domain.datamap.*;
 import core.org.akaza.openclinica.domain.user.UserAccount;
 import core.org.akaza.openclinica.service.OCUserDTO;
@@ -36,7 +34,10 @@ import core.org.akaza.openclinica.service.crfdata.EnketoUrlService;
 import core.org.akaza.openclinica.web.SQLInitServlet;
 import core.org.akaza.openclinica.web.pform.OpenRosaService;
 import core.org.akaza.openclinica.web.pform.StudyAndSiteEnvUuid;
+import org.akaza.openclinica.service.UserService;
+import org.akaza.openclinica.web.restful.errors.ErrorConstants;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,6 +59,8 @@ public class QueryServiceImpl implements QueryService {
     @Autowired
     private ItemDataDao itemDataDao;
     @Autowired
+    private ItemDataService itemDataService;
+    @Autowired
     private DiscrepancyNoteDao discrepancyNoteDao;
     @Autowired
     private ResolutionStatusDao resolutionStatusDao;
@@ -73,10 +76,15 @@ public class QueryServiceImpl implements QueryService {
     private BeanFactory beanFactory;
     @Autowired
     private EnketoUrlService enketoUrlService;
+    @Autowired
+    private UserService userService;
 
     @Autowired
     private ApplicationContext appContext;
     public static final String DASH = "-";
+    public static final String QUERY_KEYWORD = "Query";
+
+    public static final Integer DEFAULT_DISCREPANCY_NOTE_DISPLAYID_LENGTH = 9;
 
     @Override
     public void process(QueryServiceHelperBean helperBean, SubmissionContainer container, Node itemNode, int itemOrdinal) throws Exception {
@@ -164,21 +172,21 @@ public class QueryServiceImpl implements QueryService {
         }
     }
 
-    public DiscrepancyNote createQuery(QueryServiceHelperBean helperBean, QueryBean queryBean,boolean parentDn) throws Exception {
+    public DiscrepancyNote createQuery(QueryServiceHelperBean helperBean, QueryBean queryBean,boolean parentDn) {
         DiscrepancyNote dn = new DiscrepancyNote();
         dn.setStudy(helperBean.getContainer().getStudy());
         dn.setEntityType("itemData");
 
         dn.setDetailedNotes(queryBean.getComment());
-        if (queryBean.getType().equals(QueryType.QUERY.getName())) {
+        if (queryBean.getType().equalsIgnoreCase(QueryType.QUERY.getName()) || queryBean.getType().equalsIgnoreCase(QUERY_KEYWORD)) {
             dn.setDiscrepancyNoteType(new DiscrepancyNoteType(3));
             setResolutionStatus(queryBean, dn);
         }else if
-            (queryBean.getType().equals(QueryType.REASON.getName())){
+            (queryBean.getType().equalsIgnoreCase(QueryType.REASON.getName())){
             dn.setDiscrepancyNoteType(new DiscrepancyNoteType(4));
             dn.setResolutionStatus(resolutionStatusDao.findById(5));
         }else if
-        (queryBean.getType().equals(QueryType.ANNOTATION.getName())){
+        (queryBean.getType().equalsIgnoreCase(QueryType.ANNOTATION.getName())){
             dn.setDiscrepancyNoteType(new DiscrepancyNoteType(2));
             dn.setResolutionStatus(resolutionStatusDao.findById(5));
         }
@@ -186,12 +194,12 @@ public class QueryServiceImpl implements QueryService {
         if (user == null) {
             dn.setUserAccountByOwnerId(helperBean.getContainer().getUser());
         } else {
-            UserAccount userAccountByOwnerId = userAccountDao.findByUserName(user);
+            UserAccount userAccountByOwnerId = userService.findByUserNameCaseInSensitive(user);
             dn.setUserAccountByOwnerId(userAccountByOwnerId);
         }
 
         String assignedTo = "";
-        if (queryBean.getType().equals(QueryType.QUERY.getName())) {
+        if (queryBean.getType().equalsIgnoreCase(QueryType.QUERY.getName()) || queryBean.getType().equalsIgnoreCase(QUERY_KEYWORD)) {
             if (queryBean.getComment().startsWith("Automatic query for:")) {
                 assignedTo = helperBean.getContainer().getUser().getUserName();
             } else {
@@ -199,7 +207,7 @@ public class QueryServiceImpl implements QueryService {
             }
         }
         if (!StringUtils.isEmpty(assignedTo)) {
-            UserAccount userAccount = userAccountDao.findByUserName(assignedTo);
+            UserAccount userAccount = userService.findByUserNameCaseInSensitive(assignedTo);
             if (userAccount == null) {
                 userAccount = createUserAccount(assignedTo, helperBean.getContainer().getStudy());
             }
@@ -212,11 +220,77 @@ public class QueryServiceImpl implements QueryService {
         }
         dn.setDateCreated(new Date());
         dn.setThreadUuid(queryBean.getThread_id());
-        if(parentDn && queryBean.getType().equals(QueryType.QUERY.getName())){
+        if(parentDn && (queryBean.getType().equalsIgnoreCase(QueryType.QUERY.getName()) || queryBean.getType().equalsIgnoreCase(QUERY_KEYWORD))){
             int maxThreadNumber= discrepancyNoteDao.getMaxThreadNumber();
             dn.setThreadNumber(maxThreadNumber+1);
         }
+        if(queryBean.getDisplayId() != null)
+            dn.setDisplayId(queryBean.getDisplayId());
+        else
+            dn.setDisplayId(generateDisplayId(parentDn));
         return dn;
+    }
+
+    public void closeItemDiscrepancyNotesForItemData(Study study, UserAccount user, StudySubject studySubject, ItemData itemData) {
+        ResourceBundle resword = ResourceBundleProvider.getWordsBundle(Locale.ENGLISH);
+
+        // Notes & Discrepancies must be set to "closed" when event CRF is deleted
+        // parentDiscrepancyNoteList is the list of the parent DNs records only
+        List<DiscrepancyNote> parentDiscrepancyNoteList = discrepancyNoteDao.findParentNotesByItemData(itemData.getItemDataId());
+        for (DiscrepancyNote parentDiscrepancyNote : parentDiscrepancyNoteList) {
+            if (parentDiscrepancyNote.getResolutionStatus().getResolutionStatusId() != 4
+                    && parentDiscrepancyNote.getDiscrepancyNoteType().getDiscrepancyNoteTypeId() != 4) { // if
+                // the
+                // DN's
+                // resolution
+                // status is not set to
+                // Closed
+                String description = resword.getString("dn_auto-closed_description");
+                String detailedNotes = resword.getString("dn_auto_closed_item_detailed_notes");
+                // create new DN record , new DN Map record , also update the parent record
+                DiscrepancyNote dn = new DiscrepancyNote();
+                ResolutionStatus resStatus = resolutionStatusDao.findByResolutionStatusId(4);
+                dn.setStudy(study);
+                dn.setEntityType("itemData");
+                dn.setDescription(description);
+                dn.setDetailedNotes(detailedNotes);
+                dn.setDiscrepancyNoteType(parentDiscrepancyNote.getDiscrepancyNoteType()); // set to parent DN Type Id
+                dn.setResolutionStatus(resStatus); // set to closed
+                dn.setUserAccount(user);
+                dn.setUserAccountByOwnerId(user);
+                dn.setParentDiscrepancyNote(parentDiscrepancyNote);
+                dn.setDateCreated(new Date());
+                dn = discrepancyNoteDao.saveOrUpdate(dn);
+
+                // Create Mapping for new Discrepancy Note
+                DnItemDataMapId dnItemDataMapId = new DnItemDataMapId();
+                dnItemDataMapId.setDiscrepancyNoteId(dn.getDiscrepancyNoteId());
+                dnItemDataMapId.setItemDataId(itemData.getItemDataId());
+                dnItemDataMapId.setStudySubjectId(studySubject.getStudySubjectId());
+                dnItemDataMapId.setColumnName("value");
+
+                DnItemDataMap mapping = new DnItemDataMap();
+                mapping.setDnItemDataMapId(dnItemDataMapId);
+                mapping.setItemData(itemData);
+                mapping.setStudySubject(studySubject);
+                mapping.setActivated(false);
+                mapping.setDiscrepancyNote(dn);
+                dnItemDataMapDao.saveOrUpdate(mapping);
+
+                DiscrepancyNote itemParentNote = discrepancyNoteDao.findByDiscrepancyNoteId(dn.getParentDiscrepancyNote().getDiscrepancyNoteId());
+                itemParentNote.setResolutionStatus(resStatus);
+                itemParentNote.setDetailedNotes(detailedNotes);
+                itemParentNote.setUserAccount(user);
+                discrepancyNoteDao.saveOrUpdate(itemParentNote);
+            }
+        }
+
+        // Deactivate existing mappings for this ItemData
+        List<DnItemDataMap> existingMappings = dnItemDataMapDao.findByItemData(itemData.getItemDataId());
+        for (DnItemDataMap mapping : existingMappings) {
+            mapping.setActivated(false);
+            dnItemDataMapDao.saveOrUpdate(mapping);
+        }
     }
 
     private UserAccount createUserAccount(String assignedTo, Study study) {
@@ -280,7 +354,7 @@ public class QueryServiceImpl implements QueryService {
         itemData.setUserAccount(helperBean.getUserAccount());
         itemData.setDeleted(false);
         itemData.setInstanceId(helperBean.getContainer().getInstanceId());
-        itemData = itemDataDao.saveOrUpdate(itemData);
+        itemData = itemDataService.saveOrUpdate(itemData);
         return itemData;
     }
 
@@ -432,15 +506,46 @@ public class QueryServiceImpl implements QueryService {
     private void setResolutionStatus(QueryBean queryBean, DiscrepancyNote dn) {
         if (queryBean.getStatus() == null) {
             dn.setResolutionStatus(resolutionStatusDao.findById(5));
-        } else if (queryBean.getStatus().equals("new")) {
+        } else if (queryBean.getStatus().equalsIgnoreCase("new")) {
             dn.setResolutionStatus(resolutionStatusDao.findById(1));
-        } else if (queryBean.getStatus().equals("updated")) {
+        } else if (queryBean.getStatus().equalsIgnoreCase("updated")) {
             dn.setResolutionStatus(resolutionStatusDao.findById(2));
-        } else if (queryBean.getStatus().equals("closed")) {
+        } else if (queryBean.getStatus().equalsIgnoreCase("closed")) {
             dn.setResolutionStatus(resolutionStatusDao.findById(4));
-        } else if (queryBean.getStatus().equals("closed-modified")) {
+        } else if (queryBean.getStatus().equalsIgnoreCase("closed-modified")) {
             dn.setResolutionStatus(resolutionStatusDao.findById(6));
         } else {
         }
+    }
+
+    public String generateDisplayId(Boolean parentDn){
+        DiscrepancyNote dn = null;
+        String newDisplayId =null;
+        int counter = 0;
+        do {
+            String randomNo = generateRandomNoForDisplayId();
+            newDisplayId = parentDn ? "DN_"+randomNo : "CDN_"+randomNo;
+            dn = discrepancyNoteDao.findByDisplayIdWithoutNotePrefix(newDisplayId);
+            counter++;
+        }while(dn != null && counter < 10);
+        if(counter >= 10)
+            throw new OpenClinicaSystemException("Failed", ErrorConstants.ERR_GENERATING_DISCREPANCY_NOTE_ID);
+        return newDisplayId;
+    }
+
+    public String generateRandomNoForDisplayId() {
+        int discrepancyNoteLength;
+        try {
+             discrepancyNoteLength = Integer.parseInt(CoreResources.getField("discrepancyNote.displayId.length"));
+            if (discrepancyNoteLength <= 0 || discrepancyNoteLength > DEFAULT_DISCREPANCY_NOTE_DISPLAYID_LENGTH) {
+                discrepancyNoteLength = DEFAULT_DISCREPANCY_NOTE_DISPLAYID_LENGTH;
+                logger.error("Maximum DiscrepancyNoteLength is "+DEFAULT_DISCREPANCY_NOTE_DISPLAYID_LENGTH);
+            }
+        }catch (Exception e){
+            discrepancyNoteLength = DEFAULT_DISCREPANCY_NOTE_DISPLAYID_LENGTH;
+            logger.error("Error fetching DiscrepancyNoteLength from properties file");
+        }
+        int max = (int) Math.pow(10, discrepancyNoteLength);
+        return StringUtils.leftPad(Integer.toString(RandomUtils.nextInt(0, max)), discrepancyNoteLength, '0');
     }
 }

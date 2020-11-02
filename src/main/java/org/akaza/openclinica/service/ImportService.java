@@ -25,15 +25,15 @@ public interface ImportService {
 
     boolean validateAndProcessXMLDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
                                             UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-                                            boolean isSystemUserImport);
+                                            boolean isSystemUserImport, String accessToken);
 
     boolean validateAndProcessFlatFileDataImport(List<File> files, HashMap hm, String studyOID, String siteOid,
                                                  UserAccountBean userAccountBean, boolean isSystemUserImport,
-                                                 JobDetail jobDetail, String schema) throws Exception;
+                                                 JobDetail jobDetail, String schema, String accessToken) throws Exception;
 
     boolean validateAndProcessDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
-                                         UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
-                                         boolean isSystemUserImport, boolean isFlatFile);
+                                                 UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+                                                 boolean isSystemUserImport, boolean isFlatFile, String accessToken);
 
     Object validateStudySubject(SubjectDataBean subjectDataBean, Study tenantStudy);
 
@@ -45,13 +45,13 @@ public interface ImportService {
 
     ErrorObj validateEventRepeatKeyIntNumber(String repeatKey);
 
-    StudyEvent scheduleEvent(StudyEventDataBean studyEventDataBean, StudySubject studySubject, StudyEventDefinition studyEventDefinition, UserAccount userAccount);
+    StudyEvent scheduleEvent(StudyEventDataBean studyEventDataBean, StudySubject studySubject, StudyEventDefinition studyEventDefinition, UserAccount userAccount, Boolean notifyAOP);
 
     ErrorObj validateEventTransition(StudyEvent studyEvent, UserAccount userAccount, String eventStatus);
 
     StudyEvent updateStudyEventDatesAndStatus(StudyEvent studyEvent, UserAccount userAccount, String startDate, String endDate, String eventStatus);
 
-    StudyEvent updateStudyEvntStatus(StudyEvent studyEvent, UserAccount userAccount, String eventStatus);
+    StudyEvent updateStudyEvntStatus(StudyEvent studyEvent, UserAccount userAccount, String eventStatus, Boolean notifyAOP);
 
     void writeToFile(List<DataImportReport> dataImportReports, String fileName, JobType jobType);
 

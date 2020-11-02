@@ -329,6 +329,14 @@
         padding: 0 !important;
     }
 
+    .deleted {
+        color: #999;
+    }
+
+    .deleted .icon-view-within {
+        display: none;
+    }
+
     #clear-filter {
         float: left;
         margin: 5px 10px;
@@ -415,7 +423,12 @@
         }, {
             targets: 1,
             className: 'text-right'
-        }]
+        }],
+        createdRow: function(row, data, index) {
+            if (data.deleted) {
+                jQuery(row).addClass('deleted');
+            }
+        }
     });
 
     function translate(str) {
