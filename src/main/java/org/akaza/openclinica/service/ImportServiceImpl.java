@@ -1457,6 +1457,10 @@ public class ImportServiceImpl implements ImportService {
             return new ErrorObj(FAILED, ErrorConstants.ERR_PARTICIPANT_NOT_FOUND);
 
         }
+
+        if(studySubject.getStudy().isSite() && !validateService.isSiteAvailable(studySubject.getStudy().getOc_oid()))
+            return new ErrorObj(FAILED, ErrorConstants.ERR_PARTICIPANTS_SITE_NOT_AVAILABLE);
+
         subjectDataBean.setSubjectOID(studySubject.getOcOid());
         subjectDataBean.setStudySubjectID(studySubject.getLabel());
         return studySubject;
