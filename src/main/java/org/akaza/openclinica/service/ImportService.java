@@ -27,7 +27,7 @@ public interface ImportService {
                                             UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
                                             boolean isSystemUserImport, String accessToken);
 
-    boolean validateAndProcessFlatFileDataImport(List<File> files, HashMap hm, String studyOID, String siteOid,
+    boolean validateAndProcessFlatFileDataImport(List<File> files, HashMap mappingProperties, String studyOID, String siteOid,
                                                  UserAccountBean userAccountBean, boolean isSystemUserImport,
                                                  JobDetail jobDetail, String schema, String accessToken) throws Exception;
 

@@ -1,23 +1,11 @@
 package core.org.akaza.openclinica.logic.importdata;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.StringWriter;
+import java.io.*;
 import java.sql.Connection;
 import java.sql.Timestamp;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.ResourceBundle;
-import java.util.Scanner;
-import java.util.StringTokenizer;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,6 +31,7 @@ import core.org.akaza.openclinica.bean.managestudy.StudySubjectBean;
 import core.org.akaza.openclinica.bean.submit.FormLayoutBean;
 import core.org.akaza.openclinica.bean.submit.ItemBean;
 import core.org.akaza.openclinica.bean.submit.ItemGroupBean;
+import core.org.akaza.openclinica.bean.submit.crfdata.ODMContainer;
 import core.org.akaza.openclinica.dao.admin.CRFDAO;
 import core.org.akaza.openclinica.dao.core.CoreResources;
 import core.org.akaza.openclinica.dao.hibernate.StudyDao;
@@ -55,13 +44,23 @@ import core.org.akaza.openclinica.dao.submit.FormLayoutDAO;
 import core.org.akaza.openclinica.dao.submit.ItemDAO;
 import core.org.akaza.openclinica.dao.submit.ItemGroupDAO;
 import core.org.akaza.openclinica.domain.datamap.Study;
+import core.org.akaza.openclinica.exception.OpenClinicaException;
 import core.org.akaza.openclinica.exception.OpenClinicaSystemException;
 import core.org.akaza.openclinica.i18n.util.ResourceBundleProvider;
 import core.org.akaza.openclinica.service.StudyBuildService;
 import core.org.akaza.openclinica.service.crfdata.ErrorObj;
 import core.org.akaza.openclinica.service.rest.errors.ErrorConstants;
 import org.akaza.openclinica.control.SpringServletAccess;
+import org.akaza.openclinica.service.CsvFileConverterServiceImpl;
+import org.akaza.openclinica.service.ExcelFileConverterServiceImpl;
+import org.akaza.openclinica.service.SasFileConverterServiceImpl;
+import org.apache.commons.io.ByteOrderMark;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.input.BOMInputStream;
 import org.apache.commons.lang.StringUtils;
+import org.exolab.castor.mapping.Mapping;
+import org.exolab.castor.xml.Unmarshaller;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.multipart.MultipartFile;
@@ -73,17 +72,38 @@ public class FlatFileImportDataHelper extends ImportDataHelper {
 
     private final DataSource ds;
     private StudyDao studyDao;
+    private StudyBuildService studyBuildService;
+    private SasFileConverterServiceImpl sasFileConverterService;
+    private ExcelFileConverterServiceImpl excelFileConverterService;
+    private CsvFileConverterServiceImpl csvFileConverterService;
 
     private static final String PARTICIPANT_ID_HEADER_PROPERTY = "ParticipantIDHeader";
     public static final String DELIMITER_PROPERTY = "Delimiter";
     private static final String DEFAULT_PARTICIPANT_ID_HEADER = "ParticipantID";
-    private StudyBuildService studyBuildService;
+
+    //CSV file header
+    private static final String SAS_FILE_EXTENSION = "sas7bdat";
+    private static final String XLSX_FILE_EXTENSION = "xlsx";
+    private static final String CSV_FILE_EXTENSION = "csv";
+    private static final String TXT_FILE_EXTENSION = "txt";
 
     public FlatFileImportDataHelper(DataSource ds, StudyBuildService studyBuildService, StudyDao studyDao) {
         super();
         this.ds = ds;
         this.studyBuildService = studyBuildService;
         this.studyDao = studyDao;
+    }
+
+    public FlatFileImportDataHelper(DataSource ds, StudyBuildService studyBuildService, StudyDao studyDao,
+                                    SasFileConverterServiceImpl sasFileConverterService, ExcelFileConverterServiceImpl excelFileConverterService,
+                                    CsvFileConverterServiceImpl csvFileConverterService) {
+        super();
+        this.ds = ds;
+        this.studyBuildService = studyBuildService;
+        this.studyDao = studyDao;
+        this.sasFileConverterService = sasFileConverterService;
+        this.excelFileConverterService = excelFileConverterService;
+        this.csvFileConverterService = csvFileConverterService;
     }
 
     /**
@@ -1396,4 +1416,137 @@ public class FlatFileImportDataHelper extends ImportDataHelper {
 
         return study;
     }
+
+    public ODMContainer createOdmContainer(List<File> files, HashMap hm, String studyOid) throws Exception {
+        File odmXml = makeOdmXmlFile(files, hm, studyOid);
+        String importXml = FileUtils.readFileToString(odmXml, "UTF-8");
+
+
+        Mapping myMap = new Mapping();
+        String ODM_MAPPING_DIRPath = CoreResources.ODM_MAPPING_DIR;
+        myMap.loadMapping(ODM_MAPPING_DIRPath + File.separator + "cd_odm_mapping.xml");
+
+        Unmarshaller um1 = new Unmarshaller(myMap);
+        ODMContainer odmContainer = null;
+        InputStream inputStream = null;
+        try {
+            // unmarshal xml to java
+            inputStream = new ByteArrayInputStream(importXml.getBytes());
+            String defaultEncoding = "UTF-8";
+
+            BOMInputStream bOMInputStream = new BOMInputStream(inputStream);
+            ByteOrderMark bom = bOMInputStream.getBOM();
+            String charsetName = bom == null ? defaultEncoding : bom.getCharsetName();
+            InputStreamReader reader = new InputStreamReader(new BufferedInputStream(bOMInputStream), charsetName);
+
+            odmContainer = (ODMContainer) um1.unmarshal(reader);
+
+        } catch (Exception e) {
+            logger.error("found exception with xml transform {}", e);
+            throw new OpenClinicaException(e.getMessage(), org.akaza.openclinica.web.restful.errors.ErrorConstants.ERR_INVALID_XML_FILE);
+        } finally {
+            inputStream.close();
+        }
+        return odmContainer;
+    }
+
+    public File makeOdmXmlFile(List<File> files, HashMap hm, String studyOID) throws Exception {
+        /**
+         *  prepare mapping file
+         */
+        File mappingFile = null;
+        for (File file : files) {
+            if (file.getName().toLowerCase().endsWith(".properties")) {
+                mappingFile = file;
+                Study publicStudy = null;
+                if (!org.apache.commons.lang.StringUtils.isEmpty(studyOID))
+                    publicStudy = studyDao.findPublicStudy(studyOID);
+                if (publicStudy != null)
+                    CoreResources.setRequestSchema(publicStudy.getSchemaName());
+                break;
+            }
+        }
+
+        for (File file : files) {
+            // skip mapping file
+            if (file.getName().toLowerCase().endsWith(".properties")) {
+            } else {
+                File dataFile = processData(mappingFile, file, studyOID);
+                String originalFileName = dataFile.getName();
+                String dataStr = transformTextToODMxml(mappingFile, dataFile, hm);
+                return saveDataToFile(dataStr, originalFileName, studyOID);
+            }
+        }
+        return null;
+    }
+
+    public File processData(File mappingFile, File dataFile, String studyOID) throws IOException, OpenClinicaException {
+        String importFileDir = getImportFileDir(studyOID);
+        String fileType = com.google.common.io.Files.getFileExtension(dataFile.getAbsolutePath());
+        if (fileType.equals(SAS_FILE_EXTENSION)) {
+            // convert sas to pipe-delimited
+            dataFile = sasFileConverterService.convert(dataFile);
+        } else if (fileType.equals(XLSX_FILE_EXTENSION)) {
+            // convert xlsx to pipe-delimited
+            dataFile = excelFileConverterService.convert(dataFile);
+        } else if (fileType.equals(CSV_FILE_EXTENSION)) {
+            // convert csv to pipe-delimited
+            dataFile = csvFileConverterService.convert(dataFile);
+        } else if (fileType.equals(TXT_FILE_EXTENSION)) {
+            Properties mappingProperties = readMappingProperties(mappingFile);
+            String delimiter = mappingProperties.getProperty(FlatFileImportDataHelper.DELIMITER_PROPERTY);
+            if (delimiter != null) {
+                if (delimiter.length() != 1) {
+                    throw new OpenClinicaException("Invalid delimiter character", org.akaza.openclinica.web.restful.errors.ErrorConstants.INVALID_DELIMITER);
+                }
+                dataFile = csvFileConverterService.convert(dataFile, delimiter.charAt(0));
+            }
+        }
+
+        BufferedReader reader = new BufferedReader(new FileReader(dataFile));
+
+        //get original file name
+        String orginalFileName = dataFile.getName();
+        int pos = orginalFileName.indexOf(".");
+        if (pos > 0) {
+            orginalFileName = orginalFileName.substring(0, pos);
+        }
+
+        //first line
+        String columnLine = reader.readLine();
+        String line = columnLine;
+
+        File oneFile = new File(importFileDir + orginalFileName + ".txt");
+        FileOutputStream fos = new FileOutputStream(oneFile);
+        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
+        bw.write(columnLine);
+
+        try {
+            while (line != null) {
+                // read next line
+                line = reader.readLine();
+                if (line != null) {
+                    bw.write("\r");
+                    bw.write(line);
+                }
+
+            }
+            if (bw != null) {
+                bw.close();
+            }
+            reader.close();
+
+        } catch (Exception e) {
+            logger.error("Error while accessing the process the data: ", e);
+        }
+
+        return oneFile;
+    }
+
+    private Properties readMappingProperties(File mappingFile) throws IOException {
+        Properties mappingProperties = new Properties();
+        mappingProperties.load(new FileReader(mappingFile));
+        return mappingProperties;
+    }
+
 }
