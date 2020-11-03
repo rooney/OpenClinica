@@ -625,8 +625,7 @@ public class OpenRosaSubmissionController {
 
     public void updateStudyEventStatus(Study study, StudySubject studySubject, StudyEventDefinition sed, StudyEvent studyEvent, UserAccount userAccount, Boolean notifyAOP) {
         List<EventCrf> eventCrfs = eventCrfDao.findByStudyEventIdStudySubjectId(studyEvent.getStudyEventId(), studySubject.getOcOid());
-        List<EventDefinitionCrf> eventDefinitionCrfs = eventDefinitionCrfDao.findAvailableByStudyEventDefStudy(sed.getStudyEventDefinitionId(),
-                study.getStudyId());
+        List<EventDefinitionCrf> eventDefinitionCrfs = eventDefinitionCrfDao.findAvailableByStudyEventDefinitionId(sed.getStudyEventDefinitionId());
         studyEvent.setUpdateId(userAccount.getUserId());
         studyEvent.setDateUpdated(new Date());
         int countOfEventCrfsInEDC = getCountOfEventCrfsInEDC(eventCrfs, eventDefinitionCrfs);
@@ -673,8 +672,10 @@ public class OpenRosaSubmissionController {
                     ){
                 for (EventDefinitionCrf eventDefinitionCrf : eventDefinitionCrfs) {
                     if (eventDefinitionCrf.getCrf().getCrfId() == evCrf.getFormLayout().getCrf().getCrfId()) {
+                        //Skip counting if the required form is removed
+                        if(eventDefinitionCrf.getRequiredCrf() && evCrf.isCurrentlyRemoved() && !evCrf.isCurrentlyArchived())
+                            continue;
                         count++;
-                        break;
                     }
                 }
             }
