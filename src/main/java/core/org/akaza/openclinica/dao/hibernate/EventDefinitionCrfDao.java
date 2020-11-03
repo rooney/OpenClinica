@@ -22,6 +22,14 @@ public class EventDefinitionCrfDao extends AbstractDomainDao<EventDefinitionCrf>
         return (List<EventDefinitionCrf>) q.list();
     }
 
+    public List<EventDefinitionCrf> findAvailableByStudyEventDefinitionId(int studyEventDefinitionId) {
+        String query = "from " + getDomainClassName() + " do where do.studyEventDefinition.studyEventDefinitionId = :studyeventdefinitionid"
+                + " and do.statusId = 1";
+        org.hibernate.Query q = getCurrentSession().createQuery(query);
+        q.setInteger("studyeventdefinitionid", studyEventDefinitionId);
+        return (List<EventDefinitionCrf>) q.list();
+    }
+
     @SuppressWarnings("unchecked")
     public List<EventDefinitionCrf> findAvailableByStudyEventDefStudy(Integer studyEventDefinitionId, Integer studyId) {
         String query = "from " + getDomainClassName() + " do where do.studyEventDefinition.studyEventDefinitionId = :studyeventdefid "
