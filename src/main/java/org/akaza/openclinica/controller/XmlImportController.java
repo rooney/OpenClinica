@@ -1,16 +1,11 @@
 package org.akaza.openclinica.controller;
 
-import core.org.akaza.openclinica.bean.odmbeans.DiscrepancyNotesBean;
-import core.org.akaza.openclinica.service.CustomParameterizedException;
-import core.org.akaza.openclinica.service.UtilService;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import core.org.akaza.openclinica.bean.login.ErrorMessage;
+import core.org.akaza.openclinica.bean.login.ImportDataResponseFailureDTO;
 import core.org.akaza.openclinica.bean.login.StudyUserRoleBean;
 import core.org.akaza.openclinica.bean.login.UserAccountBean;
 import core.org.akaza.openclinica.bean.rule.XmlSchemaValidationHelper;
 import core.org.akaza.openclinica.bean.submit.crfdata.ODMContainer;
-import org.akaza.openclinica.control.SpringServletAccess;
-import org.akaza.openclinica.controller.helper.RestfulServiceHelper;
 import core.org.akaza.openclinica.dao.core.CoreResources;
 import core.org.akaza.openclinica.dao.hibernate.StudyDao;
 import core.org.akaza.openclinica.dao.hibernate.UserAccountDao;
@@ -18,11 +13,17 @@ import core.org.akaza.openclinica.domain.datamap.JobDetail;
 import core.org.akaza.openclinica.domain.datamap.Study;
 import core.org.akaza.openclinica.domain.enumsupport.JobType;
 import core.org.akaza.openclinica.domain.user.UserAccount;
-//import core.org.akaza.openclinica.service.*;
-import org.akaza.openclinica.service.ValidateService;
-import org.akaza.openclinica.web.restful.errors.ErrorConstants;
+import core.org.akaza.openclinica.logic.importdata.ImportDataHelper;
+import core.org.akaza.openclinica.service.CustomParameterizedException;
+import core.org.akaza.openclinica.service.DataImportService;
+import core.org.akaza.openclinica.service.UtilService;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import org.akaza.openclinica.control.SpringServletAccess;
 import org.akaza.openclinica.service.ImportService;
 import org.akaza.openclinica.service.UserService;
+import org.akaza.openclinica.service.ValidateService;
+import org.akaza.openclinica.web.restful.errors.ErrorConstants;
 import org.apache.commons.io.ByteOrderMark;
 import org.apache.commons.io.input.BOMInputStream;
 import org.exolab.castor.mapping.Mapping;
@@ -51,8 +52,8 @@ import java.util.concurrent.CompletableFuture;
  */
 @RestController
 @RequestMapping( value = "/auth/api" )
-@Api( value = "ImportController", tags = {"Clinical Data"}, description = "REST API for Data Import" )
-public class ImportController {
+@Api( value = "XmlImportController", tags = {"Clinical Data"}, description = "REST API for Data Import" )
+public class XmlImportController {
 
     @Autowired
     private UserService userService;
@@ -68,26 +69,32 @@ public class ImportController {
 
     @Autowired
     private StudyDao studyDao;
+
     @Autowired
     UserAccountDao userAccountDao;
 
+    @Autowired
+    private DataImportService dataImportService;
+
     protected final Logger logger = LoggerFactory.getLogger(getClass().getName());
-    private static final String ENTITY_NAME = "ImportController";
+    public static final String FAILED = "Failed";
     private XmlSchemaValidationHelper schemaValidator = new XmlSchemaValidationHelper();
 
-    public ImportController() {
+    public XmlImportController() {
     }
 
 
     @ApiOperation( value = "To import data in an .xml file", notes = "Will import the data in a xml file " )
     @RequestMapping( value = "/clinicaldata/import", method = RequestMethod.POST )
     public ResponseEntity<Object> importDataXMLFile(HttpServletRequest request, @RequestParam("file") MultipartFile file) throws Exception {
+
         String fileNm = "";
-        String importXml = null;
+        String importXml;
+
         if (file != null) {
             fileNm = file.getOriginalFilename();
             if (fileNm != null && fileNm.endsWith(".xml")) {
-                importXml = RestfulServiceHelper.readFileToString(file);
+                importXml = ImportDataHelper.readFileToString(file);
             } else {
                 logger.error("file is not an xml extension file");
                 return new ResponseEntity(ErrorConstants.ERR_FILE_FORMAT_NOT_SUPPORTED, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
@@ -128,7 +135,6 @@ public class ImportController {
         } catch (Exception e) {
             logger.error("found exception with xml transform {}", e);
             return new ResponseEntity(ErrorConstants.ERR_INVALID_XML_FILE + "\n" + e.getMessage(), HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-
         } finally {
             inputStream.close();
         }
@@ -212,10 +218,26 @@ public class ImportController {
     }
 
 
-
-
     private Study getTenantStudy(String studyOid) {
         return studyDao.findByOcOID(studyOid);
+    }
+
+    private ImportDataResponseFailureDTO importDataResponseFailureDTOHelper(String errorConstant) {
+        ImportDataResponseFailureDTO responseFailureDTO = new ImportDataResponseFailureDTO();
+        ArrayList<ErrorMessage> errorMsgs = new ArrayList<>();
+        responseFailureDTO.setMessage("VALIDATION FAILED");
+        ErrorMessage error = createErrorMessage(errorConstant, errorConstant);
+        errorMsgs.add(error);
+        responseFailureDTO.setErrors(errorMsgs);
+        return responseFailureDTO;
+    }
+
+    public ErrorMessage createErrorMessage(String code, String message) {
+        ErrorMessage errorMsg = new ErrorMessage();
+        errorMsg.setCode(code);
+        errorMsg.setMessage(message);
+
+        return errorMsg;
     }
 
     public String startImportJob(ODMContainer odmContainer, String schema, String studyOid, String siteOid,
@@ -228,17 +250,18 @@ public class ImportController {
         if (isSystemUserImport) {
             // For system level imports, instead of running import as an asynchronous job, run it synchronously
             logger.debug("Running import synchronously");
-            boolean isImportSuccessful = importService.validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, null, isSystemUserImport, accessToken);
+            boolean isImportSuccessful = importService.validateAndProcessXMLDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, null, isSystemUserImport, accessToken);
             if (!isImportSuccessful) {
                 // Throw an error if import fails such that randomize service can update the status accordingly
                 throw new CustomParameterizedException(ErrorConstants.ERR_IMPORT_FAILED);
             }
+
             return null;
         } else {
             JobDetail jobDetail = userService.persistJobCreated(study, site, userAccount, JobType.XML_IMPORT, fileNm);
             CompletableFuture<Object> future = CompletableFuture.supplyAsync(() -> {
                 try {
-                    importService.validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, accessToken);
+                    importService.validateAndProcessXMLDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, accessToken);
                 } catch (Exception e) {
                     logger.error("Exception is thrown while processing dataImport: " , e);
                     userService.persistJobFailed(jobDetail,fileNm);
@@ -256,9 +279,5 @@ public class ImportController {
 
         return new File(SpringServletAccess.getPropertiesDir(context) + fileNm);
     }
-
-
-
-
 
 }

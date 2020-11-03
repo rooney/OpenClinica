@@ -45,6 +45,7 @@ import core.org.akaza.openclinica.web.SQLInitServlet;
 import core.org.akaza.openclinica.web.bean.EntityBeanTable;
 import org.akaza.openclinica.control.SpringServletAccess;
 import org.akaza.openclinica.controller.KeycloakController;
+import org.akaza.openclinica.service.ImportService;
 import org.akaza.openclinica.service.UserService;
 import org.akaza.openclinica.service.ValidateService;
 import org.akaza.openclinica.view.Page;
@@ -1493,6 +1494,10 @@ public abstract class SecureController extends HttpServlet implements SingleThre
 
     protected ValidateService getValidateService() {
         return (ValidateService) SpringServletAccess.getApplicationContext(context).getBean("validateService");
+    }
+
+    protected UtilService getUtilService() {
+        return (UtilService) SpringServletAccess.getApplicationContext(context).getBean("utilService");
     }
 
     protected StudyDao getStudyDao() {

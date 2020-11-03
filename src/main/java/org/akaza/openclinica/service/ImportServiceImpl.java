@@ -4,19 +4,6 @@ import core.org.akaza.openclinica.bean.login.UserAccountBean;
 import core.org.akaza.openclinica.bean.odmbeans.ChildNoteBean;
 import core.org.akaza.openclinica.bean.odmbeans.DiscrepancyNoteBean;
 import core.org.akaza.openclinica.bean.submit.crfdata.*;
-import core.org.akaza.openclinica.exception.OpenClinicaSystemException;
-import core.org.akaza.openclinica.i18n.util.ResourceBundleProvider;
-import core.org.akaza.openclinica.service.*;
-import core.org.akaza.openclinica.web.pform.StudyAndSiteEnvUuid;
-import org.akaza.openclinica.domain.enumsupport.EventCrfWorkflowStatusEnum;
-import org.akaza.openclinica.domain.enumsupport.SdvStatus;
-import org.akaza.openclinica.domain.enumsupport.StudyEventWorkflowStatusEnum;
-import org.akaza.openclinica.controller.dto.DataImportReport;
-import org.akaza.openclinica.controller.helper.table.ItemCountInForm;
-import org.akaza.openclinica.controller.openrosa.OpenRosaSubmissionController;
-import org.akaza.openclinica.controller.openrosa.QueryService;
-import org.akaza.openclinica.controller.openrosa.SubmissionContainer;
-import org.akaza.openclinica.controller.openrosa.processor.QueryServiceHelperBean;
 import core.org.akaza.openclinica.core.form.xform.QueryBean;
 import core.org.akaza.openclinica.core.form.xform.QueryType;
 import core.org.akaza.openclinica.dao.core.CoreResources;
@@ -25,9 +12,12 @@ import core.org.akaza.openclinica.domain.Status;
 import core.org.akaza.openclinica.domain.datamap.*;
 import core.org.akaza.openclinica.domain.enumsupport.JobType;
 import core.org.akaza.openclinica.domain.user.UserAccount;
-import core.org.akaza.openclinica.service.JobService;
-import core.org.akaza.openclinica.service.UtilService;
+import core.org.akaza.openclinica.exception.OpenClinicaSystemException;
+import core.org.akaza.openclinica.i18n.util.ResourceBundleProvider;
+import core.org.akaza.openclinica.logic.importdata.FlatFileImportDataHelper;
+import core.org.akaza.openclinica.service.*;
 import core.org.akaza.openclinica.service.crfdata.ErrorObj;
+import core.org.akaza.openclinica.web.pform.StudyAndSiteEnvUuid;
 import org.akaza.openclinica.controller.dto.DataImportReport;
 import org.akaza.openclinica.controller.helper.table.ItemCountInForm;
 import org.akaza.openclinica.controller.openrosa.OpenRosaSubmissionController;
@@ -44,10 +34,11 @@ import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
@@ -56,7 +47,6 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * This Service class is used with View Study Subject Page
@@ -143,7 +133,25 @@ public class ImportServiceImpl implements ImportService {
     QueryService queryService;
 
     @Autowired
-    private DiscrepancyNoteDao discrepancyNoteDao;
+    DiscrepancyNoteDao discrepancyNoteDao;
+
+    @Autowired
+    @Qualifier("dataSource")
+    DataSource dataSource;
+
+    @Autowired
+    StudyBuildService studyBuildService;
+
+    @Autowired
+    SasFileConverterServiceImpl sasFileConverterService;
+
+    @Autowired
+    ExcelFileConverterServiceImpl excelFileConverterService;
+
+    @Autowired
+    CsvFileConverterServiceImpl csvFileConverterService;
+
+    public FlatFileImportDataHelper flatFileImportDataHelper;
 
     @Autowired
     private ImportValidationService importValidationService;
@@ -190,13 +198,27 @@ public class ImportServiceImpl implements ImportService {
     private static final String EVENT_IS_SIGNED = "Event is Signed";
     private static final String CLOSED_MODIFIED_RESOLUTION_STATUS = "closed-modified";
 
-
-
     SimpleDateFormat sdf_fileName = new SimpleDateFormat("yyyy-MM-dd'-'HHmmssSSS'Z'");
     SimpleDateFormat sdf_logFile = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 
     @Transactional
-    public boolean validateAndProcessDataImport(ODMContainer odmContainer, String studyOid, String siteOid, UserAccountBean userAccountBean, String schema, JobDetail jobDetail, boolean isSystemUserImport, String accessToken) {
+    public boolean validateAndProcessFlatFileDataImport(List<File> files, HashMap mappingProperties, String studyOid, String siteOid, UserAccountBean userAccountBean,
+                                                        boolean isSystemUserImport, JobDetail jobDetail, String schema, String accessToken) throws Exception {
+        ODMContainer odmContainer = getFlatFileImportDataHelper().createOdmContainer(files, mappingProperties, studyOid);
+        return validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, true, accessToken);
+    }
+
+    @Transactional
+    public boolean validateAndProcessXMLDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
+                                                   UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+                                                   boolean isSystemUserImport, String accessToken) {
+        return validateAndProcessDataImport(odmContainer, studyOid, siteOid, userAccountBean, schema, jobDetail, isSystemUserImport, false, accessToken);
+    }
+
+    @Transactional
+    public boolean validateAndProcessDataImport(ODMContainer odmContainer, String studyOid, String siteOid,
+                                                UserAccountBean userAccountBean, String schema, JobDetail jobDetail,
+                                                boolean isSystemUserImport, boolean isFlatFile, String accessToken) {
         ResourceBundleProvider.updateLocale(Locale.ENGLISH);
         CoreResources.setRequestSchema(schema);
 
@@ -210,7 +232,7 @@ public class ImportServiceImpl implements ImportService {
             logger.error("Study {} Not Valid", tenantStudy.getOc_oid());
         }
         String studyEnvUUId = null;
-        if(tenantStudy.isSite())
+        if (tenantStudy.isSite())
             studyEnvUUId = tenantStudy.getStudy().getStudyEnvUuid();
         else
             studyEnvUUId = tenantStudy.getStudyEnvUuid();
@@ -225,7 +247,13 @@ public class ImportServiceImpl implements ImportService {
         String envType = tenantStudy.getStudy() == null ? tenantStudy.getEnvType().toString() : tenantStudy.getStudy().getEnvType().toString();
 
         sdf_fileName.setTimeZone(TimeZone.getTimeZone("GMT"));
-        String fileName = uniqueIdentifier + DASH + envType + UNDERSCORE + JobType.XML_IMPORT + "_" + sdf_fileName.format(new Date()) + ".csv";
+
+        String fileName;
+        if (isFlatFile) {
+            fileName = uniqueIdentifier + DASH + envType + UNDERSCORE + JobType.FLAT_FILE_IMPORT + "_" + sdf_fileName.format(new Date()) + ".csv";
+        } else {
+            fileName = uniqueIdentifier + DASH + envType + UNDERSCORE + JobType.XML_IMPORT + "_" + sdf_fileName.format(new Date()) + ".csv";
+        }
 
         logger.debug("Job Filename is : {}", fileName);
 
@@ -253,10 +281,10 @@ public class ImportServiceImpl implements ImportService {
 
                 tenantStudy = studySubject.getStudy();
                 StudyAndSiteEnvUuid studyAndSiteEnvUuid = new StudyAndSiteEnvUuid();
-                if(tenantStudy.isSite()) {
+                if (tenantStudy.isSite()) {
                     studyAndSiteEnvUuid.setSiteEnvUuid(tenantStudy.getStudyEnvSiteUuid());
                     studyAndSiteEnvUuid.setStudyEnvUuid(tenantStudy.getStudy().getStudyEnvUuid());
-                }else
+                } else
                     studyAndSiteEnvUuid.setStudyEnvUuid(tenantStudy.getStudyEnvUuid());
                 List<OCUserDTO> acceptedUsers = userService.filterUserBasedOnStudyEventUuid(userRolesFormUserService, studyAndSiteEnvUuid);
 
@@ -274,10 +302,10 @@ public class ImportServiceImpl implements ImportService {
                     eventObject = validateStudyEvent(studyEventDataBean, studySubject, userAccount);
                     if (eventObject instanceof ErrorObj) {
                         ErrorObj errorObj = (ErrorObj) eventObject;
-                        if(errorObj.getMessage().equals(ErrorConstants.ERR_FORMLAYOUTOID_NOT_FOUND)){
+                        if (errorObj.getMessage().equals(ErrorConstants.ERR_FORMLAYOUTOID_NOT_FOUND)) {
                             List<FormDataBean> tempformData = studyEventDataBean.getFormData();
                             String formOid = null;
-                            if(tempformData.size() > 0 && tempformData.get(0).getFormOID() != null)
+                            if (tempformData.size() > 0 && tempformData.get(0).getFormOID() != null)
                                 formOid = tempformData.get(0).getFormOID();
                             dataImportReport = new DataImportReport(subjectDataBean.getSubjectOID(), subjectDataBean.getStudySubjectID(), studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formOid, null, null, null, FORM_TYPE_KEYWORD, errorObj.getCode(), null, errorObj.getMessage());
                         } else
@@ -293,19 +321,19 @@ public class ImportServiceImpl implements ImportService {
                     ArrayList<FormDataBean> formDataBeans = studyEventDataBean.getFormData();
                     int formDataBeanCount = 0;
                     for (FormDataBean formDataBean : formDataBeans) {
-                        subjectLastUpdateNeedsToBeUpdated = ( processFormDataBean(studyEventDataBean, formDataBean, tenantStudy, studySubject, studyEvent, userAccount, session, acceptedUsers, dataImportReports, formDataBeanCount)
-                                                                || subjectLastUpdateNeedsToBeUpdated);
+                        subjectLastUpdateNeedsToBeUpdated = (processFormDataBean(studyEventDataBean, formDataBean, tenantStudy, studySubject, studyEvent, userAccount, session, acceptedUsers, dataImportReports, formDataBeanCount)
+                                || subjectLastUpdateNeedsToBeUpdated);
                         formDataBeanCount++;
                     } // formDataBean for loop
-                    try{
-                        if(BooleanUtils.isTrue(studyEventDataBean.getSigned()) && !studyEvent.isCurrentlySigned() && studyEventDataBean.getSignatures() == null) {
+                    try {
+                        if (BooleanUtils.isTrue(studyEventDataBean.getSigned()) && !studyEvent.isCurrentlySigned() && studyEventDataBean.getSignatures() == null) {
                             throw new OpenClinicaSystemException(FAILED, ErrorConstants.ERR_CANNOT_SIGN_EVENT_WITHOUT_ATTESTATION);
                         }
-                        if(studyEventDataBean.getSignatures() != null) {
+                        if (studyEventDataBean.getSignatures() != null) {
                             studyEvent = studyEventDao.findByStudyEventId(studyEvent.getStudyEventId());
                             importValidationService.validateSignatureForStudyEvent(studyEventDataBean, studyEvent, studySubject);
                             Boolean signaturesImported = importSignatures(studyEventDataBean, studyEvent, userAccount, dataImportReports);
-                            if(signaturesImported) {
+                            if (signaturesImported) {
                                 dataImportReport = new DataImportReport(subjectDataBean.getSubjectOID(), subjectDataBean.getStudySubjectID(), studyEventDataBean.getStudyEventOID(), null, null, null, null, null, SIGNATURE_TYPE_KEYWORD, ATTESTATIONS_IMPORTED, sdf_logFile.format(new Date()), null);
                                 dataImportReports.add(dataImportReport);
                             }
@@ -318,12 +346,11 @@ public class ImportServiceImpl implements ImportService {
                             session.flush();
                             session.clear();
                         }
-                    }catch (OpenClinicaSystemException e){
-                        if(e.getMultiErrors() == null) {
+                    } catch (OpenClinicaSystemException e) {
+                        if (e.getMultiErrors() == null) {
                             dataImportReport = new DataImportReport(subjectDataBean.getSubjectOID(), subjectDataBean.getStudySubjectID(), studyEventDataBean.getStudyEventOID(), null, null, null, null, null, SIGNATURE_TYPE_KEYWORD, e.getErrorCode(), null, e.getMessage());
                             dataImportReports.add(dataImportReport);
-                        }
-                        else {
+                        } else {
                             for (ErrorObj err : e.getMultiErrors()) {
                                 dataImportReport = new DataImportReport(subjectDataBean.getSubjectOID(), subjectDataBean.getStudySubjectID(), studyEventDataBean.getStudyEventOID(), null, null, null, null, null, SIGNATURE_TYPE_KEYWORD, err.getCode(), null, err.getMessage());
                                 dataImportReports.add(dataImportReport);
@@ -333,7 +360,7 @@ public class ImportServiceImpl implements ImportService {
                     }
 
                 } // StudyEventDataBean for loop
-                if(subjectLastUpdateNeedsToBeUpdated) {
+                if (subjectLastUpdateNeedsToBeUpdated) {
                     studySubject = studySubjectDao.findById(studySubject.getStudySubjectId());
                     studySubject.setUpdateId(userAccount.getUserId());
                     studySubject.setDateUpdated(new Date());
@@ -343,13 +370,18 @@ public class ImportServiceImpl implements ImportService {
 
             } // StudySubjectDataBean for loop
         } else { // subjectDataBean ==null
-            dataImportReport = new DataImportReport(null, null, null, null, null, null, null, null,  SIGNATURE_TYPE_KEYWORD, FAILED, null, ErrorConstants.ERR_SUBJECT_DATA_MISSING);
+            dataImportReport = new DataImportReport(null, null, null, null, null, null, null, null, SIGNATURE_TYPE_KEYWORD, FAILED, null, ErrorConstants.ERR_SUBJECT_DATA_MISSING);
             dataImportReports.add(dataImportReport);
             logger.info("SubjectData is missing ");
         }
 
 
-        writeToFile(dataImportReports, fileName, JobType.XML_IMPORT);
+        if (isFlatFile) {
+            writeToFile(dataImportReports, fileName, JobType.FLAT_FILE_IMPORT);
+        } else {
+            writeToFile(dataImportReports, fileName, JobType.XML_IMPORT);
+        }
+
         if (isSystemUserImport) {
             // For system level import, check if the import failed and return the status
             boolean hasImportFailed = dataImportReports.stream()
@@ -366,7 +398,7 @@ public class ImportServiceImpl implements ImportService {
     }
 
     private Boolean processFormDataBean(StudyEventDataBean studyEventDataBean, FormDataBean formDataBean, Study tenantStudy,
-                     StudySubject studySubject, StudyEvent studyEvent, UserAccount userAccount, Session session, List<OCUserDTO> acceptedUsers, List<DataImportReport> dataImportReports, int formDataBeanCount) {
+                                        StudySubject studySubject, StudyEvent studyEvent, UserAccount userAccount, Session session, List<OCUserDTO> acceptedUsers, List<DataImportReport> dataImportReports, int formDataBeanCount) {
         DataImportReport dataImportReport = null;
         StudyEventDefinition studyEventDefinition = studyEvent.getStudyEventDefinition();
         Boolean proceedToSdv = true;
@@ -389,7 +421,7 @@ public class ImportServiceImpl implements ImportService {
         try {
             importValidationService.validateForm(formDataBean, tenantStudy, studyEventDefinition);
             crf = crfDao.findByOcOID(formDataBean.getFormOID());
-        }catch (OpenClinicaSystemException e){
+        } catch (OpenClinicaSystemException e) {
             dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(), studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(), null, null, null, FORM_TYPE_KEYWORD, e.getErrorCode(), null, e.getMessage());
             dataImportReports.add(dataImportReport);
             logger.error("FormOID {} related issue", formDataBean.getFormOID());
@@ -401,7 +433,7 @@ public class ImportServiceImpl implements ImportService {
         try {
             importValidationService.validateEventDefnCrf(tenantStudy, studyEventDefinition, crf);
             edc = createEventDefnCrf(tenantStudy, studyEventDefinition, crf);
-        }catch (OpenClinicaSystemException e){
+        } catch (OpenClinicaSystemException e) {
             dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(), studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(), null, null, null, FORM_TYPE_KEYWORD, e.getErrorCode(), null, e.getMessage());
             dataImportReports.add(dataImportReport);
             logger.error("FormOID {} related issue", formDataBean.getFormOID());
@@ -425,7 +457,7 @@ public class ImportServiceImpl implements ImportService {
         try {
             importValidationService.validateEventCrf(studySubject, studyEvent, formLayout, edc);
             eventCrf = getEventCrf(studySubject, studyEvent, userAccount, crf, formLayout, formDataBean);
-        }catch (OpenClinicaSystemException e){
+        } catch (OpenClinicaSystemException e) {
             dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(), studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(), null, null, null, FORM_TYPE_KEYWORD, e.getErrorCode(), null, e.getMessage());
             dataImportReports.add(dataImportReport);
             logger.error("EventCrf {} related issue", formDataBean.getFormOID());
@@ -462,10 +494,10 @@ public class ImportServiceImpl implements ImportService {
                 itemGroup = (ItemGroup) itemGroupObject;
             }
 
-            List<ItemData> itemDatasInItemGroup= itemDataDao.findByEventCrfGroupWithOrdinalNAndDeletedIncluded(eventCrf.getEventCrfId(), itemGroup.getItemGroupId(), Integer.parseInt(itemGroupDataBean.getItemGroupRepeatKey()));
+            List<ItemData> itemDatasInItemGroup = itemDataDao.findByEventCrfGroupWithOrdinalNAndDeletedIncluded(eventCrf.getEventCrfId(), itemGroup.getItemGroupId(), Integer.parseInt(itemGroupDataBean.getItemGroupRepeatKey()));
             try {
                 validateRemovedItemGroup(itemDatasInItemGroup);
-            }catch (OpenClinicaSystemException e){
+            } catch (OpenClinicaSystemException e) {
                 dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(), studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(), null, ITEM_GROUP_TYPE_KEYWORD, e.getErrorCode(), null, e.getMessage());
                 dataImportReports.add(dataImportReport);
                 proceedToSdv = false;
@@ -483,8 +515,7 @@ public class ImportServiceImpl implements ImportService {
                 try {
                     importValidationService.validateItem(itemDataBean, crf, itemGroupDataBean, itemCountInForm);
                     itemObject = createOrUpdateItem(itemDataBean, crf, eventCrf, itemGroupDataBean, userAccount, itemCountInForm, tenantStudy, studySubject, reasonForChange, itemDatasInItemGroup);
-                }
-                catch (OpenClinicaSystemException e){
+                } catch (OpenClinicaSystemException e) {
                     proceedToSdv = false;
                     dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(), studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(), itemDataBean.getItemOID(), ITEM_TYPE_KEYWORD, e.getErrorCode(), null, e.getMessage());
                     dataImportReports.add(dataImportReport);
@@ -505,18 +536,18 @@ public class ImportServiceImpl implements ImportService {
                 } else if (itemObject instanceof Item) {
                     item = (Item) itemObject;
                 }
-                if(item == null)
+                if (item == null)
                     item = itemDao.findByOcOID(itemDataBean.getItemOID());
                 ItemData itemData = getItemDataFromItemGroup(item, itemDatasInItemGroup);
-                for(DiscrepancyNoteBean discrepancyNoteBean : itemDataBean.getDiscrepancyNotes().getDiscrepancyNotes()){
+                for (DiscrepancyNoteBean discrepancyNoteBean : itemDataBean.getDiscrepancyNotes().getDiscrepancyNotes()) {
                     try {
                         importValidationService.validateQuery(discrepancyNoteBean, itemData, acceptedUsers);
-                        createQuery(discrepancyNoteBean, tenantStudy, studySubject, eventCrf, itemDataBean.getItemOID(), itemGroupDataBean , itemData, null, null, true, dataImportReports, userAccount);
-                    }catch (OpenClinicaSystemException e){
+                        createQuery(discrepancyNoteBean, tenantStudy, studySubject, eventCrf, itemDataBean.getItemOID(), itemGroupDataBean, itemData, null, null, true, dataImportReports, userAccount);
+                    } catch (OpenClinicaSystemException e) {
                         String insertionType = QUERY_TYPE_KEYWORD;
-                        if(discrepancyNoteBean.getNoteType() != null && discrepancyNoteBean.getNoteType().equalsIgnoreCase(QueryType.ANNOTATION.getName()))
+                        if (discrepancyNoteBean.getNoteType() != null && discrepancyNoteBean.getNoteType().equalsIgnoreCase(QueryType.ANNOTATION.getName()))
                             insertionType = ANNOTATION_TYPE_KEYWORD;
-                        if(e.getMultiErrors() == null){
+                        if (e.getMultiErrors() == null) {
                             dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(), studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(), itemDataBean.getItemOID(), insertionType, e.getErrorCode(), null, e.getMessage());
                             dataImportReports.add(dataImportReport);
                         } else {
@@ -532,7 +563,7 @@ public class ImportServiceImpl implements ImportService {
             }//itemDataBean for loop
             try {
                 importValidationService.validateItemGroupRemoved(itemGroupDataBean, (ItemGroup) itemGroupObject);
-                if(BooleanUtils.isTrue(itemGroupDataBean.isRemoved())){
+                if (BooleanUtils.isTrue(itemGroupDataBean.isRemoved())) {
                     removeItemGroup(tenantStudy, studySubject, eventCrf, (ItemGroup) itemGroupObject, itemGroupDataBean, userAccount);
                     dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(),
                             studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(),
@@ -541,10 +572,10 @@ public class ImportServiceImpl implements ImportService {
                     dataImportReports.add(dataImportReport);
                     subjectLastUpdateNeedsToBeUpdated = true;
                 }
-            }catch (OpenClinicaSystemException e){
+            } catch (OpenClinicaSystemException e) {
                 dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(), studyEventDataBean.getStudyEventOID(),
                         studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(),
-                        null, ITEM_GROUP_TYPE_KEYWORD,  e.getErrorCode(), null, e.getMessage());
+                        null, ITEM_GROUP_TYPE_KEYWORD, e.getErrorCode(), null, e.getMessage());
                 dataImportReports.add(dataImportReport);
                 logger.error("ItemGroupOID {} related issue", itemGroupDataBean.getItemGroupOID());
             }
@@ -582,19 +613,20 @@ public class ImportServiceImpl implements ImportService {
                 // Update Event Crf Status into Initial Data Entry
                 eventCrf = updateEventCrf(eventCrf, userAccount, EventCrfWorkflowStatusEnum.INITIAL_DATA_ENTRY, null);
             }
+
         }
 
         // check if all Forms within this Event is Complete
         try {
             importValidationService.validateSdvStatus(studySubject, formDataBean, eventCrf, proceedToSdv, isSdvStatusUpdatedInternally);
             Boolean sdvImported = setSdvStatusOnEventCrf(formDataBean, eventCrf, userAccount);
-            if(sdvImported) {
+            if (sdvImported) {
                 dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(),
                         studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(),
                         null, null, null, SDV_TYPE_KEYWORD, UPDATED, sdf_logFile.format(new Date()), null);
                 dataImportReports.add(dataImportReport);
             }
-        }catch (OpenClinicaSystemException e) {
+        } catch (OpenClinicaSystemException e) {
             dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(),
                     studyEventDataBean.getStudyEventOID(), studyEventDataBean.getStudyEventRepeatKey(), formDataBean.getFormOID(),
                     null, null, null, SDV_TYPE_KEYWORD, e.getErrorCode(), null, e.getMessage());
@@ -621,7 +653,7 @@ public class ImportServiceImpl implements ImportService {
         } catch (FileNotFoundException | UnsupportedEncodingException e) {
             logger.error("Error while accessing file to start writing: ", e);
         } finally {
-            if (jobType.equals(JobType.XML_IMPORT))
+            if (jobType.equals(JobType.XML_IMPORT) || jobType.equals(JobType.FLAT_FILE_IMPORT))
                 writer.print(writeImportToTextFile(dataImportReports));
             else if (jobType.equals(JobType.SCHEDULE_EVENT))
                 writer.print(writeBulkEventScheduleOrUpdateToTextFile(dataImportReports));
@@ -792,7 +824,7 @@ public class ImportServiceImpl implements ImportService {
     }
 
     private ItemData createItemData(EventCrf eventCrf, String itemDataValue, UserAccount userAccount, Item item, int groupRepeatKey) {
-        if(eventCrf.getEventCrfId() == 0)
+        if (eventCrf.getEventCrfId() == 0)
             saveEventCrf(eventCrf, userAccount);
         ItemData itemData = new ItemData();
         itemData.setEventCrf(eventCrf);
@@ -816,26 +848,25 @@ public class ImportServiceImpl implements ImportService {
         return itemData;
     }
 
-    private EventCrf saveSdvStatus(EventCrf eventCrf, SdvStatus sdvStatus, UserAccount userAccount){
+    private EventCrf saveSdvStatus(EventCrf eventCrf, SdvStatus sdvStatus, UserAccount userAccount) {
         eventCrf.setSdvStatus(sdvStatus);
-        if(sdvStatus.equals(SdvStatus.VERIFIED))
+        if (sdvStatus.equals(SdvStatus.VERIFIED))
             eventCrf.setLastSdvVerifiedDate(new Date());
         eventCrf.setSdvUpdateId(userAccount.getUserId());
         return saveEventCrf(eventCrf, userAccount);
     }
 
-    public EventCrf saveEventCrf(EventCrf eventCrf, UserAccount userAccount){
+    public EventCrf saveEventCrf(EventCrf eventCrf, UserAccount userAccount) {
         // only created new event crf once
-        if (eventCrf.getEventCrfId() == 0)
-        {
-            if(eventCrf.getStudyEvent().getStudyEventId() == 0) {
+        if (eventCrf.getEventCrfId() == 0) {
+            if (eventCrf.getStudyEvent().getStudyEventId() == 0) {
                 eventCrf.setStudyEvent(studyEventService.saveOrUpdateWithoutAOPListener(eventCrf.getStudyEvent()));
                 logger.info("Created StudyEvent: {}", eventCrf.getStudyEvent().getStudyEventDefinition().getOc_oid());
             }
             updateStudyEvntStatus(eventCrf.getStudyEvent(), userAccount, DATA_ENTRY_STARTED, false);
         }
         eventCrf = eventCrfService.saveOrUpdateWithoutAOPListener(eventCrf);
-        logger.info("Saved or updated EvenCrf: {}",eventCrf.getFormLayout().getCrf().getOcOid());
+        logger.info("Saved or updated EvenCrf: {}", eventCrf.getFormLayout().getCrf().getOcOid());
         return eventCrf;
     }
 
@@ -872,7 +903,7 @@ public class ImportServiceImpl implements ImportService {
         if (dateCompleted != null)
             eventCrf.setDateCompleted(dateCompleted);
         eventCrf = eventCrfService.saveOrUpdateWithoutAOPListener(eventCrf);
-        logger.info("Saved or updated EvenCrf: {}",eventCrf.getFormLayout().getCrf().getOcOid());
+        logger.info("Saved or updated EvenCrf: {}", eventCrf.getFormLayout().getCrf().getOcOid());
         return eventCrf;
     }
 
@@ -934,7 +965,7 @@ public class ImportServiceImpl implements ImportService {
         }
         studyEvent.setDateUpdated(new Date());
         studyEvent.setUpdateId(userAccount.getUserId());
-        if(!notifyAOP)
+        if (!notifyAOP)
             studyEvent = studyEventService.saveOrUpdateWithoutAOPListener(studyEvent);
         else
             studyEvent = studyEventService.saveOrUpdate(studyEvent);
@@ -963,7 +994,7 @@ public class ImportServiceImpl implements ImportService {
         }
 
         FormLayout formLayout = formLayoutDao.findByNameCrfId(formLayoutName, crf.getCrfId());
-        if(formLayout == null)
+        if (formLayout == null)
             return new ErrorObj(FAILED, ErrorConstants.ERR_FORMLAYOUTOID_NOT_FOUND);
         return formLayout;
     }
@@ -1079,7 +1110,6 @@ public class ImportServiceImpl implements ImportService {
                 }
             }
         } else {   // Visit Event
-
             if (studyEventDefinition.isRepeating()) {   // Repeating Visit Event
                 if (studyEventDataBean.getStudyEventRepeatKey() != null && !studyEventDataBean.getStudyEventRepeatKey().equals("")) {   // Repeat Key present
                     //validate repeat key for integer
@@ -1215,7 +1245,7 @@ public class ImportServiceImpl implements ImportService {
 
     public StudyEvent scheduleEvent(StudyEventDataBean studyEventDataBean, StudySubject studySubject, StudyEventDefinition studyEventDefinition, UserAccount userAccount, Boolean notifyAOP) {
         StudyEvent studyEvent = buildStudyEvent(studySubject, studyEventDefinition, Integer.parseInt(studyEventDataBean.getStudyEventRepeatKey()), userAccount, studyEventDataBean.getStartDate(), studyEventDataBean.getEndDate());
-        if(!notifyAOP)
+        if (!notifyAOP)
             studyEvent = studyEventService.saveOrUpdateWithoutAOPListener(studyEvent);
         else
             studyEvent = studyEventService.saveOrUpdate(studyEvent);
@@ -1466,8 +1496,8 @@ public class ImportServiceImpl implements ImportService {
         return eventCrf;
     }
 
-    public boolean setSdvStatusOnEventCrf(FormDataBean formDataBean, EventCrf eventCrf, UserAccount userAccount){
-        if(formDataBean.getSdvStatusString() != null) {
+    public boolean setSdvStatusOnEventCrf(FormDataBean formDataBean, EventCrf eventCrf, UserAccount userAccount) {
+        if (formDataBean.getSdvStatusString() != null) {
             SdvStatus newSdvStatus = formDataBean.getSdvStatus();
             if (newSdvStatus != null && (eventCrf.getSdvStatus() == null || !eventCrf.getSdvStatus().equals(newSdvStatus))) {
                 if (newSdvStatus.equals(SdvStatus.VERIFIED)) {
@@ -1509,21 +1539,21 @@ public class ImportServiceImpl implements ImportService {
         return itemGroup;
     }
 
-    public void validateRemovedItemGroup(List<ItemData> itemDatasInItemGroup){
+    public void validateRemovedItemGroup(List<ItemData> itemDatasInItemGroup) {
         Boolean isRemovedGroup = false;
-        for(ItemData itemData : itemDatasInItemGroup){
-            if(itemData != null && BooleanUtils.isTrue(itemData.isDeleted())) {
+        for (ItemData itemData : itemDatasInItemGroup) {
+            if (itemData != null && BooleanUtils.isTrue(itemData.isDeleted())) {
                 isRemovedGroup = true;
                 break;
             }
         }
-        if(isRemovedGroup)
+        if (isRemovedGroup)
             throw new OpenClinicaSystemException(FAILED, ErrorConstants.ERR_ITEMGROUP_IS_ALREADY_REMOVED);
     }
 
     private DataImportReport createOrUpdateItem(ImportItemDataBean itemDataBean, CrfBean crf, EventCrf eventCrf, ImportItemGroupDataBean itemGroupDataBean, UserAccount userAccount, ItemCountInForm itemCountInForm, Study study, StudySubject studySubject, String reasonForChange, List<ItemData> itemDatasInItemGroup) {
         ErrorObj errorObj = null;
-        if(itemDataBean.getValue() == null) {
+        if (itemDataBean.getValue() == null) {
             itemCountInForm.setInsertedUpdatedSkippedItemCountInForm(itemCountInForm.getInsertedUpdatedSkippedItemCountInForm() + 1);
             return new DataImportReport(null, null, null, null, null, null, null, null, ITEM_TYPE_KEYWORD, SKIPPED, null, ITEMDATA_SKIPPED_MSG);
         }
@@ -1558,19 +1588,20 @@ public class ImportServiceImpl implements ImportService {
         }
     }
 
-    public ItemData getItemDataFromItemGroup(Item item, List<ItemData> itemDatasInItemGroup){
-        for(ItemData tempItemData : itemDatasInItemGroup){
-            if(tempItemData.getItem().equals(item) && BooleanUtils.isNotTrue(tempItemData.isDeleted())) {
+    public ItemData getItemDataFromItemGroup(Item item, List<ItemData> itemDatasInItemGroup) {
+        for (ItemData tempItemData : itemDatasInItemGroup) {
+            if (tempItemData.getItem().equals(item) && BooleanUtils.isNotTrue(tempItemData.isDeleted())) {
                 return tempItemData;
             }
         }
         return null;
     }
+
     private void updateClosedToClosedModifiedQuery(UserAccount userAccount, Study study, StudySubject studySubject, ImportItemGroupDataBean itemGroupDataBean, ItemData itemData) {
         ResourceBundle resword = ResourceBundleProvider.getWordsBundle();
         String closedModifiedDetailedNote = resword.getString("closed_modified_message");
         List<DiscrepancyNote> parentDiscrepancyNotes = discrepancyNoteDao.findClosedParentQueriesByItemData(itemData.getItemDataId());
-        for(DiscrepancyNote parentDiscrepancyNote : parentDiscrepancyNotes) {
+        for (DiscrepancyNote parentDiscrepancyNote : parentDiscrepancyNotes) {
             DiscrepancyNoteBean discrepancyNoteBean = new DiscrepancyNoteBean();
             discrepancyNoteBean.setNoteType(QueryType.QUERY.getName());
             discrepancyNoteBean.setDisplayId(parentDiscrepancyNote.getDisplayId());
@@ -1583,6 +1614,7 @@ public class ImportServiceImpl implements ImportService {
             createQuery(discrepancyNoteBean, study, studySubject, itemData.getEventCrf(), itemData.getItem().getOcOid(), itemGroupDataBean, itemData, null, null, true, new ArrayList<DataImportReport>(), userAccount);
         }
     }
+
     /**
      * @param userAccount
      * @param study
@@ -1603,22 +1635,22 @@ public class ImportServiceImpl implements ImportService {
         }
         childNoteBean.setOwnerUserName(userAccount.getUserName());
         discrepancyNoteBean.getChildNotes().add(childNoteBean);
-        createQuery(discrepancyNoteBean, study, studySubject, itemData.getEventCrf(), itemData.getItem().getOcOid(), itemGroupDataBean,  itemData, null, null, true, new ArrayList<DataImportReport>(), userAccount);
+        createQuery(discrepancyNoteBean, study, studySubject, itemData.getEventCrf(), itemData.getItem().getOcOid(), itemGroupDataBean, itemData, null, null, true, new ArrayList<DataImportReport>(), userAccount);
         return eb;
     }
 
     private DiscrepancyNote createQuery(DiscrepancyNoteBean discrepancyNoteBean, Study study, StudySubject studySubject,
-             EventCrf eventCrf, String itemOid, ImportItemGroupDataBean itemGroupDataBean,ItemData itemData, ChildNoteBean childNoteBean,
-             DiscrepancyNote parentDn, Boolean isParentDn, List<DataImportReport> dataImportReports, UserAccount importerUserAccount) {
+                                        EventCrf eventCrf, String itemOid, ImportItemGroupDataBean itemGroupDataBean, ItemData itemData, ChildNoteBean childNoteBean,
+                                        DiscrepancyNote parentDn, Boolean isParentDn, List<DataImportReport> dataImportReports, UserAccount importerUserAccount) {
 
         SubmissionContainer container = new SubmissionContainer();
         container.setStudy(study);
         container.setSubject(studySubject);
         QueryServiceHelperBean helperBean = new QueryServiceHelperBean();
-        if(itemData == null) {
+        if (itemData == null) {
             Item item = itemDao.findByOcOID(itemOid);
             itemData = itemDataDao.findByItemEventCrfOrdinal(item.getItemId(), eventCrf.getEventCrfId(), Integer.parseInt(itemGroupDataBean.getItemGroupRepeatKey()));
-            if(itemData == null){
+            if (itemData == null) {
                 itemData = createItemData(eventCrf, "", importerUserAccount, item, Integer.parseInt(itemGroupDataBean.getItemGroupRepeatKey()));
             }
         }
@@ -1629,22 +1661,21 @@ public class ImportServiceImpl implements ImportService {
         QueryBean queryBean = new QueryBean();
         String displayId = isParentDn ? discrepancyNoteBean.getDisplayId() : childNoteBean.getDisplayId();
         Boolean isNoteCreated = false;
-        if(displayId != null)
+        if (displayId != null)
             discNote = discrepancyNoteDao.findByDisplayIdWithoutNotePrefix(displayId);
-        if(discNote == null) {
+        if (discNote == null) {
             isNoteCreated = true;
             queryBean.setType(discrepancyNoteBean.getNoteType());
             queryBean.setDisplayId(displayId);
-            if (!isParentDn){
+            if (!isParentDn) {
                 queryBean.setComment(childNoteBean.getDetailedNote());
                 queryBean.setStatus(childNoteBean.getStatus());
                 queryBean.setUser(childNoteBean.getOwnerUserName());
                 UserAccount userAccount = userService.findByUserNameCaseInSensitive(childNoteBean.getOwnerUserName());
                 helperBean.getContainer().setUser(userAccount);
-                if(childNoteBean.getUserRef() != null)
+                if (childNoteBean.getUserRef() != null)
                     queryBean.setAssigned_to(childNoteBean.getUserRef().getUserName());
-            }
-            else
+            } else
                 queryBean.setComment("");
             discNote = (DiscrepancyNote) queryService.createQuery(helperBean, queryBean, isParentDn);
             if (isParentDn)
@@ -1658,35 +1689,35 @@ public class ImportServiceImpl implements ImportService {
             discNote = discrepancyNoteDao.saveOrUpdate(discNote);
             queryService.saveQueryItemDatamap(helperBean);
             String insertionType = QUERY_TYPE_KEYWORD;
-            if(discrepancyNoteBean.getNoteType().equalsIgnoreCase(QueryType.ANNOTATION.getName()))
+            if (discrepancyNoteBean.getNoteType().equalsIgnoreCase(QueryType.ANNOTATION.getName()))
                 insertionType = ANNOTATION_TYPE_KEYWORD;
-            DataImportReport dataImportReport =  new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(),
+            DataImportReport dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(),
                     eventCrf.getStudyEvent().getStudyEventDefinition().getOc_oid(), eventCrf.getStudyEvent().getSampleOrdinal().toString(),
-                    eventCrf.getFormLayout().getCrf().getOcOid(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(), itemOid, insertionType, INSERTED, sdf_logFile.format(new Date()),  discNote.getDisplayId());
+                    eventCrf.getFormLayout().getCrf().getOcOid(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(), itemOid, insertionType, INSERTED, sdf_logFile.format(new Date()), discNote.getDisplayId());
             dataImportReports.add(dataImportReport);
         }
         if (isParentDn) {
-            for(int i = 0 ; i < discrepancyNoteBean.getChildNotes().size();i++){
+            for (int i = 0; i < discrepancyNoteBean.getChildNotes().size(); i++) {
                 DiscrepancyNote childNote = createQuery(discrepancyNoteBean, study, studySubject, eventCrf, itemOid, itemGroupDataBean, itemData, discrepancyNoteBean.getChildNotes().get(i), discNote, false, dataImportReports, importerUserAccount);
-                if(i == discrepancyNoteBean.getChildNotes().size()-1){
+                if (i == discrepancyNoteBean.getChildNotes().size() - 1) {
                     discNote.setResolutionStatus(childNote.getResolutionStatus());
                     discNote.setUserAccount(childNote.getUserAccount());
                     discNote.setDetailedNotes(childNote.getDetailedNotes());
                     discNote.setUserAccountByOwnerId(childNote.getUserAccountByOwnerId());
                     discNote = discrepancyNoteDao.saveOrUpdate(discNote);
-                    if(!isNoteCreated){
+                    if (!isNoteCreated) {
                         String insertionType = QUERY_TYPE_KEYWORD;
-                        if(discrepancyNoteBean.getNoteType().equalsIgnoreCase(QueryType.ANNOTATION.getName()))
+                        if (discrepancyNoteBean.getNoteType().equalsIgnoreCase(QueryType.ANNOTATION.getName()))
                             insertionType = ANNOTATION_TYPE_KEYWORD;
-                        DataImportReport dataImportReport =  new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(),
+                        DataImportReport dataImportReport = new DataImportReport(studySubject.getOcOid(), studySubject.getLabel(),
                                 eventCrf.getStudyEvent().getStudyEventDefinition().getOc_oid(), eventCrf.getStudyEvent().getSampleOrdinal().toString(),
-                                eventCrf.getFormLayout().getCrf().getOcOid(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(), itemOid, insertionType, UPDATED, sdf_logFile.format(new Date()),  discNote.getDisplayId());
+                                eventCrf.getFormLayout().getCrf().getOcOid(), itemGroupDataBean.getItemGroupOID(), itemGroupDataBean.getItemGroupRepeatKey(), itemOid, insertionType, UPDATED, sdf_logFile.format(new Date()), discNote.getDisplayId());
                         dataImportReports.add(dataImportReport);
                     }
                 }
             }
         }
-        return  discNote;
+        return discNote;
     }
 
     private EventDefinitionCrf createEventDefnCrf(Study tenantStudy, StudyEventDefinition studyEventDefinition, CrfBean crf) {
@@ -1731,13 +1762,12 @@ public class ImportServiceImpl implements ImportService {
     }
 
 
-
     private void removeItemGroup(Study study, StudySubject studySubject, EventCrf eventCrf, ItemGroup itemGroup, ImportItemGroupDataBean igDataBean, UserAccount userAccount) {
-        List<ItemData> itemDataList = (ArrayList<ItemData>)itemDataDao.findByEventCrfGroup(eventCrf.getEventCrfId(), itemGroup.getItemGroupId());
+        List<ItemData> itemDataList = (ArrayList<ItemData>) itemDataDao.findByEventCrfGroup(eventCrf.getEventCrfId(), itemGroup.getItemGroupId());
         CrfVersion crfVersion = crfVersionDao.findAllByCrfId(eventCrf.getFormLayout().getCrf().getCrfId()).get(0);
-        for(ItemData itemData : itemDataList){
+        for (ItemData itemData : itemDataList) {
             ItemGroupMetadata igm = itemGroupMetadataDao.findByItemCrfVersion(itemData.getItem().getItemId(), crfVersion.getCrfVersionId());
-            if(igm.isRepeatingGroup() && itemData.getOrdinal() == Integer.parseInt(igDataBean.getItemGroupRepeatKey()) && !itemData.isDeleted()){
+            if (igm.isRepeatingGroup() && itemData.getOrdinal() == Integer.parseInt(igDataBean.getItemGroupRepeatKey()) && !itemData.isDeleted()) {
                 itemData.setDeleted(true);
                 updateItemData(itemData, userAccount, itemData.getValue());
                 queryService.closeItemDiscrepancyNotesForItemData(study, userAccount, studySubject, itemData);
@@ -1745,6 +1775,7 @@ public class ImportServiceImpl implements ImportService {
             }
         }
     }
+
     public void updateEventAndSubjectStatusIfSigned(StudyEvent studyEvent, StudySubject studySubject, UserAccount userAccount) {
         if (studyEvent.isCurrentlySigned()) {
             studyEvent.setSigned(Boolean.FALSE);
@@ -1770,39 +1801,39 @@ public class ImportServiceImpl implements ImportService {
         return studyEvent;
     }
 
-    public Boolean importSignatures(StudyEventDataBean studyEventDataBean, StudyEvent studyEvent, UserAccount userAccount, List<DataImportReport> dataImportReports){
+    public Boolean importSignatures(StudyEventDataBean studyEventDataBean, StudyEvent studyEvent, UserAccount userAccount, List<DataImportReport> dataImportReports) {
         Boolean signaturesImported = false;
         ResourceBundle resword = ResourceBundleProvider.getWordsBundle(Locale.ENGLISH);
         AuditLogEventType auditLogEventType = new AuditLogEventType();
         auditLogEventType.setAuditLogEventTypeId(65);
         List<SignatureBean> signatureBeans = studyEventDataBean.getSignatures();
         boolean manuallyImportToAuditLog = true;
-        for(SignatureBean signatureBean: signatureBeans){
+        for (SignatureBean signatureBean : signatureBeans) {
 
             String attestationMsg = signatureBean.getAttestation().concat(" " + resword.getString(IMPORT_SIGNATURE_POSTFIX_KEYWORD));
             AuditLogEvent auditLogEvent = new AuditLogEvent();
 
             //condition to check if this is the last signature bean
-            if(signatureBean.equals(signatureBeans.get(signatureBeans.size()-1)) && BooleanUtils.isTrue(studyEventDataBean.getSigned())){
-                    //Auto-insert to audit_log_event won't get triggered if the signed status and attestation is same
-                    if(!studyEvent.isCurrentlySigned() || studyEvent.getAttestation() == null || !studyEvent.getAttestation().equals(attestationMsg))
-                        manuallyImportToAuditLog = false;
-                    studyEvent.setAttestation(attestationMsg);
-                    studyEvent.setSigned(true);
-                    studyEvent.setUpdateId(userAccount.getUserId());
-                    studyEvent.setDateUpdated(new Date());
-                    studyEventService.saveOrUpdateWithoutAOPListener(studyEvent);
-                    logger.info("Updated StudyEvent for signing: {}", studyEvent.getStudyEventDefinition().getOc_oid());
-            } else if(!auditLogEventDao.findSignedEventAuditLogByAttestation(studyEvent, attestationMsg).isEmpty()) {
+            if (signatureBean.equals(signatureBeans.get(signatureBeans.size() - 1)) && BooleanUtils.isTrue(studyEventDataBean.getSigned())) {
+                //Auto-insert to audit_log_event won't get triggered if the signed status and attestation is same
+                if (!studyEvent.isCurrentlySigned() || studyEvent.getAttestation() == null || !studyEvent.getAttestation().equals(attestationMsg))
+                    manuallyImportToAuditLog = false;
+                studyEvent.setAttestation(attestationMsg);
+                studyEvent.setSigned(true);
+                studyEvent.setUpdateId(userAccount.getUserId());
+                studyEvent.setDateUpdated(new Date());
+                studyEventService.saveOrUpdateWithoutAOPListener(studyEvent);
+                logger.info("Updated StudyEvent for signing: {}", studyEvent.getStudyEventDefinition().getOc_oid());
+            } else if (!auditLogEventDao.findSignedEventAuditLogByAttestation(studyEvent, attestationMsg).isEmpty()) {
                 DataImportReport dataImportReport = new DataImportReport(studyEvent.getStudySubject().getOcOid(), studyEvent.getStudySubject().getLabel(), studyEventDataBean.getStudyEventOID(), null, null, null, null, null, SIGNATURE_TYPE_KEYWORD, SKIPPED, null, SIGNATURE_SKIPPED_MSG);
                 dataImportReports.add(dataImportReport);
                 continue;
             }
-            if(manuallyImportToAuditLog) {
+            if (manuallyImportToAuditLog) {
                 auditLogEvent.setAuditDate(new Date());
                 auditLogEvent.setAuditTable("study_event");
                 auditLogEvent.setUserAccount(userAccount);
-                if(studyEvent.getSigned() != null){
+                if (studyEvent.getSigned() != null) {
                     auditLogEvent.setOldValue(studyEvent.getSigned().toString());
                     auditLogEvent.setNewValue(studyEvent.getSigned().toString());
                 }
@@ -1816,15 +1847,23 @@ public class ImportServiceImpl implements ImportService {
         }
         return signaturesImported;
     }
-    
+
     private Boolean updateSdvStatusIfAlreadyVerified(EventCrf eventCrf, UserAccount userAccount) {
-        if(eventCrf.getSdvStatus() != null && eventCrf.getSdvStatus().equals(SdvStatus.VERIFIED)){
+        if (eventCrf.getSdvStatus() != null && eventCrf.getSdvStatus().equals(SdvStatus.VERIFIED)) {
             eventCrf.setSdvStatus(SdvStatus.CHANGED_SINCE_VERIFIED);
             eventCrf.setUpdateId(userAccount.getUserId());
             eventCrfService.saveOrUpdateWithoutAOPListener(eventCrf);
-            logger.info("Updated EventCrf for sdvStatus: {}",eventCrf.getFormLayout().getCrf().getOcOid());
+            logger.info("Updated EventCrf for sdvStatus: {}", eventCrf.getFormLayout().getCrf().getOcOid());
             return true;
         }
         return false;
     }
+
+    public FlatFileImportDataHelper getFlatFileImportDataHelper() {
+        if (flatFileImportDataHelper == null) {
+            flatFileImportDataHelper = new FlatFileImportDataHelper(dataSource, studyBuildService, studyDao, sasFileConverterService, excelFileConverterService, csvFileConverterService);
+        }
+        return flatFileImportDataHelper;
+    }
+
 }
