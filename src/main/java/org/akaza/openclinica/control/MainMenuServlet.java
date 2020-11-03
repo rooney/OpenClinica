@@ -132,7 +132,7 @@ public class MainMenuServlet extends SecureController {
         }
         setPresetValues(fp.getPresetValues());
 
-        if (currentRole.isInvestigator() || currentRole.isResearchAssistant() || currentRole.isResearchAssistant2()) {
+        if (currentRole.isInvestigator() || currentRole.isResearchAssistant() || currentRole.isResearchAssistant2() || currentRole.isSponsor()) {
             forwardPage(Page.LIST_STUDY_SUBJECTS_SERVLET);
             return;
         }
