@@ -131,6 +131,9 @@ public class PermissionServiceImpl implements PermissionService {
         UserAccount userAccount = userAccountDao.findByUserUuid(userUuid);
         for (StudyEnvironmentRoleDTO userRole : response.getBody()) {
             Study study = studyDao.findByStudyEnvUuid(userRole.getStudyEnvironmentUuid());
+            if (study == null)
+                continue;
+
             ArrayList<StudyUserRole> roles = studyUserRoleDao.findAllUserRolesByUserAccountAndStudy(userAccount, study.getStudyId());
             for (StudyUserRole role: roles) {
                 logger.info("Role in " + study.getName() + ": " + role.getRoleName() + " vs. " + userRole.getRoleName() + "/" + userRole.getBaseRoleName() + "/" + userRole.getDynamicRoleName());
