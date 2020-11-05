@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.5.xsd">
+
+
+    <changeSet author="ron" id="2020-11-05-OC-13709" runOnChange="true">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql" />
+        </preConditions>
+        <sql splitStatements="false">
+            INSERT INTO user_role (role_id, role_name, parent_id, role_desc) VALUES
+            (7, 'sponsor', 1, NULL);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
