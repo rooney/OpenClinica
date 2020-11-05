@@ -30,12 +30,11 @@ public class Role extends Term {
     public static final Role STUDY_RESEARCHASSISTANT = new Role(5, "ra", "Data_Entry_Person", null);
     public static final Role STUDY_MONITOR = new Role(6, "monitor", "Monitor", null);
     public static final Role STUDY_RESEARCHASSISTANT2 = new Role(7, "ra2", "site_Data_Entry_Person2", null);
-    public static final Role SPONSOR = new Role(7, "sponsor", "sponsor", null);
 
-    private static final Role[] members = { ADMIN, COORDINATOR, STUDYDIRECTOR, INVESTIGATOR, MONITOR, RESEARCHASSISTANT,RESEARCHASSISTANT2, SPONSOR};
+    private static final Role[] members = { ADMIN, COORDINATOR, STUDYDIRECTOR, INVESTIGATOR, MONITOR, RESEARCHASSISTANT,RESEARCHASSISTANT2};
     private static final List list = Arrays.asList(members);
 
-    private static final Role[] studyMembers = { STUDY_COORDINATOR, STUDY_STUDYDIRECTOR, STUDY_INVESTIGATOR, STUDY_MONITOR, STUDY_RESEARCHASSISTANT, STUDY_RESEARCHASSISTANT2, SPONSOR};
+    private static final Role[] studyMembers = { STUDY_COORDINATOR, STUDY_STUDYDIRECTOR, STUDY_INVESTIGATOR, STUDY_MONITOR, STUDY_RESEARCHASSISTANT, STUDY_RESEARCHASSISTANT2};
     private static final List studyList = Arrays.asList(studyMembers);
 
     public static final Map studyRoleMap = new LinkedHashMap();

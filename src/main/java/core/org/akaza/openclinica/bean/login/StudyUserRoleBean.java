@@ -274,10 +274,6 @@ public class StudyUserRoleBean extends AuditableEntityBean {
         return this.role == Role.STUDYDIRECTOR;
     }
 
-    public boolean isSponsor() {
-        return this.role == Role.SPONSOR;
-    }
-
     public String getStudyEnvUuid() {
         return studyEnvUuid;
     }

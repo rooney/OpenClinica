@@ -5,7 +5,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import core.org.akaza.openclinica.dao.core.CoreResources;
 import core.org.akaza.openclinica.dao.hibernate.*;
 import core.org.akaza.openclinica.domain.datamap.*;
-import core.org.akaza.openclinica.domain.user.UserAccount;
 import core.org.akaza.openclinica.web.rest.client.auth.impl.KeycloakClientImpl;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
@@ -43,13 +42,9 @@ public class PermissionServiceImpl implements PermissionService {
     @Autowired
     private StudyDao studyDao;
     @Autowired
-    private StudyUserRoleDao studyUserRoleDao;
-    @Autowired
     private StudyEventDefinitionDao studyEventDefinitionDao;
     @Autowired
     private CrfDao crfDao;
-    @Autowired
-    private UserAccountDao userAccountDao;
     @Autowired
     private KeycloakClientImpl keycloakClient;
 
@@ -126,20 +121,6 @@ public class PermissionServiceImpl implements PermissionService {
         if (logger.isDebugEnabled()) {
             for (StudyEnvironmentRoleDTO userRole : response.getBody()) {
                 logger.debug("UserRole in updateStudyUserRoles: role: " + userRole.getRoleName() + " uuid:" + userRole.getUuid());
-            }
-        }
-        UserAccount userAccount = userAccountDao.findByUserUuid(userUuid);
-        for (StudyEnvironmentRoleDTO userRole : response.getBody()) {
-            Study study = studyDao.findByStudyEnvUuid(userRole.getStudyEnvironmentUuid());
-            ArrayList<StudyUserRole> roles = studyUserRoleDao.findAllUserRolesByUserAccountAndStudy(userAccount, study.getStudyId());
-            for (StudyUserRole role: roles) {
-                logger.info("Role in " + study.getName() + ": " + role.getRoleName() + " vs. " + userRole.getRoleName() + "/" + userRole.getBaseRoleName() + "/" + userRole.getDynamicRoleName());
-                String roleName = role.getRoleName();
-                if (roleName != null) {
-                    userRole.setRoleName(role.getRoleName());
-                    userRole.setBaseRoleName(role.getRoleName());
-                    userRole.setDynamicRoleName(role.getRoleName());
-                }
             }
         }
         return response;

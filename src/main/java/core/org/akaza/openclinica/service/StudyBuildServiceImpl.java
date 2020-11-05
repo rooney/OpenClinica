@@ -148,9 +148,6 @@ public class StudyBuildServiceImpl implements StudyBuildService {
                     case 6:
                         key = "Monitor";
                         break;
-                    case 7:
-                        key = "sponsor";
-                        break;
                     default:
                         break;
                     // logger.info("No role matched when setting role description");
